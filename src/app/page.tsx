@@ -277,7 +277,12 @@ export default function Home() {
                     style={markerPosition}
                     title={title}
                     aria-label={title}
-                    onClick={() => void openPlaceDialog(place)}
+                    onClick={() => {
+                      openPlaceDialog(place).catch(() => {
+                        setRatingError("Could not load Google Maps rating.");
+                        setRatingLoading(false);
+                      });
+                    }}
                   />
                 );
               })}
