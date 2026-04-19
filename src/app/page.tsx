@@ -87,8 +87,11 @@ export default function Home() {
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackType, setFeedbackType] = useState<FeedbackType>(null);
   const [dialogPlaceId, setDialogPlaceId] = useState<number | null>(null);
-  const [ratingLoading, setRatingLoading] = useState(false);
-  const [ratingError, setRatingError] = useState("");
+  const [ratingLoadingPlaceId, setRatingLoadingPlaceId] = useState<number | null>(null);
+  const [ratingErrorState, setRatingErrorState] = useState<{ placeId: number | null; message: string }>({
+    placeId: null,
+    message: "",
+  });
 
   const selectedPlace = useMemo(
     () => places.find((place) => place.id === selectedPlaceId) ?? null,
@@ -143,27 +146,28 @@ export default function Home() {
 
   const closePlaceDialog = () => {
     setDialogPlaceId(null);
-    setRatingLoading(false);
-    setRatingError("");
+    setRatingLoadingPlaceId(null);
+    setRatingErrorState({ placeId: null, message: "" });
   };
 
   const openPlaceDialog = async (place: Place) => {
     setSelectedPlaceId(place.id);
     setDialogPlaceId(place.id);
-    setRatingError("");
+    setRatingErrorState({ placeId: null, message: "" });
 
     if (place.googleRating !== null && place.googleReviewCount !== null) {
       return;
     }
 
-    setRatingLoading(true);
+    setRatingLoadingPlaceId(place.id);
 
     try {
       const response = await fetch(
         `/api/google-rating?name=${encodeURIComponent(place.name)}&address=${encodeURIComponent(place.address)}`,
       );
       if (!response.ok) {
-        throw new Error("Failed to load rating");
+        const errorPayload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(errorPayload?.error ?? `Failed to load rating (HTTP ${response.status})`);
       }
 
       const payload = (await response.json()) as {
@@ -182,10 +186,13 @@ export default function Home() {
             : currentPlace,
         ),
       );
-    } catch {
-      setRatingError("Could not load Google Maps rating.");
+    } catch (error) {
+      setRatingErrorState({
+        placeId: place.id,
+        message: error instanceof Error ? error.message : "Could not load Google Maps rating.",
+      });
     } finally {
-      setRatingLoading(false);
+      setRatingLoadingPlaceId(null);
     }
   };
 
@@ -470,8 +477,10 @@ export default function Home() {
             <p>
               Deleted reviews: <strong>{dialogPlace.deletedCount}</strong>
             </p>
-            {ratingLoading && <p className="place-dialog-meta">Loading rating…</p>}
-            {ratingError && <p className="place-dialog-error">{ratingError}</p>}
+            {ratingLoadingPlaceId === dialogPlace.id && <p className="place-dialog-meta">Loading rating…</p>}
+            {ratingErrorState.placeId === dialogPlace.id && ratingErrorState.message && (
+              <p className="place-dialog-error">{ratingErrorState.message}</p>
+            )}
           </div>
         </div>
       )}
