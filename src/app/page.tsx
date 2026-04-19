@@ -20,6 +20,7 @@ type Submission = Place & {
 };
 
 type FeedbackType = "success" | "error" | null;
+const RATING_DECIMAL_PLACES = 1;
 
 const initialPlaces: Place[] = [
   {
@@ -453,7 +454,9 @@ export default function Home() {
             <p>
               Google Maps rating:{" "}
               <strong>
-                {dialogPlace.googleRating !== null ? dialogPlace.googleRating.toFixed(1) : "Not available"}
+                {dialogPlace.googleRating !== null
+                  ? dialogPlace.googleRating.toFixed(RATING_DECIMAL_PLACES)
+                  : "Not available"}
               </strong>
             </p>
             <p>

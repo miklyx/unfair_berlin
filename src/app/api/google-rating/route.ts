@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const SEARCH_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const MAX_RATING_REVIEW_GAP = 60;
 
 function parseNumber(value: string) {
   return Number.parseFloat(value.replace(",", "."));
@@ -24,7 +25,10 @@ function extractGoogleRating(html: string) {
   }
 
   // Limit the gap between rating and reviews to avoid matching unrelated numbers from distant text.
-  const fallbackPattern = /([0-9]+(?:[.,][0-9]+)?)\s*stars?[\s:|()\-—]{0,60}?([\d\s.,]+)\s*reviews?/i;
+  const fallbackPattern = new RegExp(
+    `([0-9]+(?:[.,][0-9]+)?)\\s*stars?[\\s:|()\\-—]{0,${MAX_RATING_REVIEW_GAP}}?([\\d\\s.,]+)\\s*reviews?`,
+    "i",
+  );
   const fallbackMatch = html.match(fallbackPattern);
   if (fallbackMatch) {
     const rating = parseNumber(fallbackMatch[1]);
