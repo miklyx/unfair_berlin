@@ -1,20 +1,20 @@
 # unfair_berlin
 
-Проект полностью на **Next.js** с базой данных **SQLite**.
+This is a **Copilot test** project built with **Next.js** and **SQLite**.
 
-## Запуск
+## Run
 
 ```bash
 npm install
 npm run dev
 ```
 
-Откройте http://localhost:3000.
+Open http://localhost:3000.
 
-## Что внутри
+## What's inside
 
-- `src/app/page.tsx` — главная страница с данными из SQLite
-- `src/app/api/notes/route.ts` — API маршрут `/api/notes`
-- `src/lib/db.ts` — инициализация SQLite и запросы
+- `src/app/page.tsx` — main page with data from SQLite
+- `src/app/api/notes/route.ts` — API route `/api/notes`
+- `src/lib/db.ts` — SQLite initialization and queries
 
-Файл базы создается автоматически: `data/app.db`.
+The database file is created automatically: `data/app.db`.
