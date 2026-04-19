@@ -278,10 +278,7 @@ export default function Home() {
                     title={title}
                     aria-label={title}
                     onClick={() => {
-                      openPlaceDialog(place).catch(() => {
-                        setRatingError("Could not load Google Maps rating.");
-                        setRatingLoading(false);
-                      });
+                      openPlaceDialog(place);
                     }}
                   />
                 );

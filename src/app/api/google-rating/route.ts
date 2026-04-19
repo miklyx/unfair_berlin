@@ -24,7 +24,7 @@ function extractGoogleRating(html: string) {
   }
 
   // Limit the gap between rating and reviews to avoid matching unrelated numbers from distant text.
-  const fallbackPattern = /([0-9]+(?:[.,][0-9]+)?)\s*stars?.{0,60}?([\d\s.,]+)\s*reviews?/i;
+  const fallbackPattern = /([0-9]+(?:[.,][0-9]+)?)\s*stars?[\s:|()\-—]{0,60}?([\d\s.,]+)\s*reviews?/i;
   const fallbackMatch = html.match(fallbackPattern);
   if (fallbackMatch) {
     const rating = parseNumber(fallbackMatch[1]);
