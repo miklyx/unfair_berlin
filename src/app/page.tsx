@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, MouseEvent, WheelEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, MouseEvent, WheelEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type Place = {
   id: number;
@@ -44,6 +44,14 @@ type MapBounds = {
   maxLng: number;
   minLat: number;
   maxLat: number;
+};
+type MapClickInfo = {
+  title: string;
+  lat: number;
+  lng: number;
+  address: string;
+  loading: boolean;
+  error: string;
 };
 
 type FeedbackType = "success" | "error" | null;
@@ -120,17 +128,37 @@ function getMarkerPosition(coords: Coordinates, bounds: MapBounds) {
   };
 }
 
-function getMapBoundsForZoomStep(zoomStep: number): MapBounds {
+function getMapSpanForZoomStep(zoomStep: number) {
   const lngSpan = (berlinBounds.maxLng - berlinBounds.minLng) / 2 ** zoomStep;
   const latSpan = (berlinBounds.maxLat - berlinBounds.minLat) / 2 ** zoomStep;
-  const centerLng = (berlinBounds.minLng + berlinBounds.maxLng) / 2;
-  const centerLat = (berlinBounds.minLat + berlinBounds.maxLat) / 2;
 
   return {
-    minLng: centerLng - lngSpan / 2,
-    maxLng: centerLng + lngSpan / 2,
-    minLat: centerLat - latSpan / 2,
-    maxLat: centerLat + latSpan / 2,
+    lngSpan,
+    latSpan,
+  };
+}
+
+function getMapBoundsForViewport(center: Coordinates, zoomStep: number): MapBounds {
+  const { lngSpan, latSpan } = getMapSpanForZoomStep(zoomStep);
+
+  return {
+    minLng: center.lng - lngSpan / 2,
+    maxLng: center.lng + lngSpan / 2,
+    minLat: center.lat - latSpan / 2,
+    maxLat: center.lat + latSpan / 2,
+  };
+}
+
+function clampMapCenter(center: Coordinates, zoomStep: number) {
+  const { lngSpan, latSpan } = getMapSpanForZoomStep(zoomStep);
+  const minCenterLng = berlinBounds.minLng + lngSpan / 2;
+  const maxCenterLng = berlinBounds.maxLng - lngSpan / 2;
+  const minCenterLat = berlinBounds.minLat + latSpan / 2;
+  const maxCenterLat = berlinBounds.maxLat - latSpan / 2;
+
+  return {
+    lng: Math.min(Math.max(center.lng, minCenterLng), maxCenterLng),
+    lat: Math.min(Math.max(center.lat, minCenterLat), maxCenterLat),
   };
 }
 
@@ -151,12 +179,22 @@ export default function Home() {
   const [isSubmissionFormOpen, setIsSubmissionFormOpen] = useState(false);
   const [isMapPickMode, setIsMapPickMode] = useState(false);
   const [mapZoomStep, setMapZoomStep] = useState(MAP_MIN_ZOOM_STEP);
+  const [mapCenter, setMapCenter] = useState<Coordinates>({
+    lat: (berlinBounds.minLat + berlinBounds.maxLat) / 2,
+    lng: (berlinBounds.minLng + berlinBounds.maxLng) / 2,
+  });
+  const [isDraggingMap, setIsDraggingMap] = useState(false);
+  const [mapClickInfo, setMapClickInfo] = useState<MapClickInfo | null>(null);
   const [dialogPlaceId, setDialogPlaceId] = useState<number | null>(null);
   const [ratingLoadingPlaceId, setRatingLoadingPlaceId] = useState<number | null>(null);
   const [ratingErrorState, setRatingErrorState] = useState<{ placeId: number | null; message: string }>({
     placeId: null,
     message: "",
   });
+  const mapRef = useRef<HTMLElement | null>(null);
+  const mapDragStateRef = useRef<{ startX: number; startY: number; startCenter: Coordinates } | null>(null);
+  const didMapDragRef = useRef(false);
+  const mapClickRequestRef = useRef(0);
 
   const selectedPlace = useMemo(
     () => places.find((place) => place.id === selectedPlaceId) ?? null,
@@ -177,7 +215,7 @@ export default function Home() {
     () => places.reduce((sum, place) => sum + place.deletedCount, 0),
     [places],
   );
-  const mapBounds = useMemo(() => getMapBoundsForZoomStep(mapZoomStep), [mapZoomStep]);
+  const mapBounds = useMemo(() => getMapBoundsForViewport(mapCenter, mapZoomStep), [mapCenter, mapZoomStep]);
   const mapEmbedUrl = useMemo(
     () =>
       `https://www.openstreetmap.org/export/embed.html?bbox=${mapBounds.minLng}%2C${mapBounds.minLat}%2C${mapBounds.maxLng}%2C${mapBounds.maxLat}&amp;layer=mapnik`,
@@ -185,11 +223,19 @@ export default function Home() {
   );
 
   const zoomInMap = () => {
-    setMapZoomStep((currentStep) => Math.min(currentStep + 1, MAP_MAX_ZOOM_STEP));
+    setMapZoomStep((currentStep) => {
+      const nextStep = Math.min(currentStep + 1, MAP_MAX_ZOOM_STEP);
+      setMapCenter((currentCenter) => clampMapCenter(currentCenter, nextStep));
+      return nextStep;
+    });
   };
 
   const zoomOutMap = () => {
-    setMapZoomStep((currentStep) => Math.max(currentStep - 1, MAP_MIN_ZOOM_STEP));
+    setMapZoomStep((currentStep) => {
+      const nextStep = Math.max(currentStep - 1, MAP_MIN_ZOOM_STEP);
+      setMapCenter((currentCenter) => clampMapCenter(currentCenter, nextStep));
+      return nextStep;
+    });
   };
 
   const handleMapWheel = (event: WheelEvent<HTMLElement>) => {
@@ -245,6 +291,18 @@ export default function Home() {
     }));
   };
 
+  const resolveAddressFromCoordinates = async (lat: number, lng: number) => {
+    const response = await fetch(
+      `/api/reverse-geocode?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`,
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to resolve address (HTTP ${response.status})`);
+    }
+
+    const payload = (await response.json()) as { address?: string };
+    return payload.address?.trim() || "";
+  };
+
   const prefillAddressFromCoordinates = async (lat: number, lng: number) => {
     setMapSelection({ lat, lng });
     setMapSelectionLoading(true);
@@ -255,17 +313,10 @@ export default function Home() {
     }));
 
     try {
-      const response = await fetch(
-        `/api/reverse-geocode?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`,
-      );
-      if (!response.ok) {
-        throw new Error(`Failed to resolve address (HTTP ${response.status})`);
-      }
-
-      const payload = (await response.json()) as { address?: string };
+      const address = await resolveAddressFromCoordinates(lat, lng);
       setFormValues((currentValues) => ({
         ...currentValues,
-        address: payload.address?.trim() || currentValues.address,
+        address: address || currentValues.address,
       }));
       setFeedbackType("success");
       setFeedbackMessage("Coordinates and address were filled from map click.");
@@ -281,7 +332,81 @@ export default function Home() {
     }
   };
 
+  const setMapClickInfoForPlace = (title: string, lat: number, lng: number, address: string) => {
+    setMapClickInfo({
+      title,
+      lat,
+      lng,
+      address,
+      loading: false,
+      error: "",
+    });
+  };
+
+  const resolveMapClickInfo = async (lat: number, lng: number) => {
+    const requestId = mapClickRequestRef.current + 1;
+    mapClickRequestRef.current = requestId;
+
+    setMapClickInfo({
+      title: "Map point",
+      lat,
+      lng,
+      address: "",
+      loading: true,
+      error: "",
+    });
+
+    try {
+      const address = await resolveAddressFromCoordinates(lat, lng);
+      if (mapClickRequestRef.current !== requestId) {
+        return;
+      }
+
+      setMapClickInfo({
+        title: "Map point",
+        lat,
+        lng,
+        address: address || "Address unavailable",
+        loading: false,
+        error: "",
+      });
+    } catch (error) {
+      if (mapClickRequestRef.current !== requestId) {
+        return;
+      }
+
+      setMapClickInfo({
+        title: "Map point",
+        lat,
+        lng,
+        address: "",
+        loading: false,
+        error: error instanceof Error ? error.message : "Could not resolve clicked location.",
+      });
+    }
+  };
+
+  const handleMapMouseDown = (event: MouseEvent<HTMLDivElement>) => {
+    if (isMapPickMode || event.button !== 0) {
+      return;
+    }
+
+    event.preventDefault();
+    didMapDragRef.current = false;
+    mapDragStateRef.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      startCenter: mapCenter,
+    };
+    setIsDraggingMap(true);
+  };
+
   const handleMapClick = (event: MouseEvent<HTMLDivElement>) => {
+    if (didMapDragRef.current) {
+      didMapDragRef.current = false;
+      return;
+    }
+
     // Ignore clicks on map pins; only bare-map clicks should prefill coordinates.
     if (event.target !== event.currentTarget) {
       return;
@@ -297,8 +422,12 @@ export default function Home() {
     const lng = mapBounds.minLng + xRatio * (mapBounds.maxLng - mapBounds.minLng);
     const lat = mapBounds.maxLat - yRatio * (mapBounds.maxLat - mapBounds.minLat);
 
-    setIsMapPickMode(false);
-    void prefillAddressFromCoordinates(lat, lng);
+    if (isMapPickMode) {
+      setIsMapPickMode(false);
+      void prefillAddressFromCoordinates(lat, lng);
+    }
+
+    void resolveMapClickInfo(lat, lng);
   };
 
   const handleOsmPlaceClick = (place: OSMPlace) => {
@@ -310,9 +439,61 @@ export default function Home() {
       lat: place.lat.toFixed(COORDINATE_DECIMAL_PLACES),
       lng: place.lng.toFixed(COORDINATE_DECIMAL_PLACES),
     }));
+    setMapClickInfoForPlace(place.name, place.lat, place.lng, place.address);
     setFeedbackType("success");
     setFeedbackMessage("OSM place copied to the submission form.");
   };
+
+  const handleReportedPlaceClick = (place: Place) => {
+    setMapClickInfoForPlace(place.name, place.lat, place.lng, place.address);
+    void openPlaceDialog(place);
+  };
+
+  useEffect(() => {
+    if (!isDraggingMap) {
+      return;
+    }
+
+    const handleWindowMouseMove = (event: globalThis.MouseEvent) => {
+      const dragState = mapDragStateRef.current;
+      const mapRect = mapRef.current?.getBoundingClientRect();
+      if (!dragState || !mapRect?.width || !mapRect.height) {
+        return;
+      }
+
+      const deltaX = event.clientX - dragState.startX;
+      const deltaY = event.clientY - dragState.startY;
+      if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
+        didMapDragRef.current = true;
+      }
+
+      const lngPerPixel = (mapBounds.maxLng - mapBounds.minLng) / mapRect.width;
+      const latPerPixel = (mapBounds.maxLat - mapBounds.minLat) / mapRect.height;
+
+      setMapCenter(
+        clampMapCenter(
+          {
+            lng: dragState.startCenter.lng - deltaX * lngPerPixel,
+            lat: dragState.startCenter.lat + deltaY * latPerPixel,
+          },
+          mapZoomStep,
+        ),
+      );
+    };
+
+    const stopDragging = () => {
+      mapDragStateRef.current = null;
+      setIsDraggingMap(false);
+    };
+
+    window.addEventListener("mousemove", handleWindowMouseMove);
+    window.addEventListener("mouseup", stopDragging);
+
+    return () => {
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mouseup", stopDragging);
+    };
+  }, [isDraggingMap, mapBounds.maxLat, mapBounds.maxLng, mapBounds.minLat, mapBounds.minLng, mapZoomStep]);
 
   const approveSubmission = (submissionId: number) => {
     setPendingSubmissions((currentPending) => {
@@ -469,6 +650,7 @@ export default function Home() {
     <>
       <main className="app-shell unfair-page">
         <section
+          ref={mapRef}
           className="map"
           aria-label="Map of unfair places"
           aria-describedby="map-zoom-instructions"
@@ -480,9 +662,10 @@ export default function Home() {
             src={mapEmbedUrl}
           />
           <div
-            className={`pin-layer${isMapPickMode ? " picking" : ""}`}
+            className={`pin-layer${isMapPickMode ? " picking" : ""}${isDraggingMap ? " dragging" : ""}`}
             aria-label="Place pins"
             onClick={handleMapClick}
+            onMouseDown={handleMapMouseDown}
           >
             {osmPlaces
               .filter((place) => isWithinBounds(place.lat, place.lng, mapBounds))
@@ -521,7 +704,7 @@ export default function Home() {
                     aria-label={title}
                     onClick={(event) => {
                       event.stopPropagation();
-                      openPlaceDialog(place);
+                      handleReportedPlaceClick(place);
                     }}
                   />
                 );
@@ -548,7 +731,8 @@ export default function Home() {
             </button>
           </div>
           <p id="map-zoom-instructions" className="sr-only">
-            Hold Ctrl or Shift and use mouse wheel to zoom the map, or use the plus and minus zoom buttons.
+            Hold left mouse button and drag to move the map. Hold Ctrl or Shift and use mouse wheel to zoom the map, or
+            use the plus and minus zoom buttons.
           </p>
         </section>
 
@@ -557,9 +741,26 @@ export default function Home() {
           <p className="intro">Community map of Berlin places reported for deleting fair negative reviews.</p>
           <p className="map-hint">
             Use &quot;Pick on map&quot; in the form to choose coordinates, or click muted OSM places (cafes, restaurants,
-            bars, pubs, nightclubs). Hold Ctrl or Shift and use mouse wheel to zoom, or use the +/− buttons.
+            bars, pubs, nightclubs). Hold left mouse button and drag to move the map. Hold Ctrl or Shift and use mouse
+            wheel to zoom, or use the +/− buttons.
           </p>
           {osmError && <p className="form-feedback error">{osmError}</p>}
+
+          <section className="panel-block">
+            <h2>Last map click</h2>
+            {!mapClickInfo && <p className="selected-place">Click map or pin to see address and coordinates.</p>}
+            {mapClickInfo && (
+              <div className="selected-place">
+                <strong>{mapClickInfo.title}</strong>
+                <br />
+                {mapClickInfo.lat.toFixed(COORDINATE_DECIMAL_PLACES)}, {mapClickInfo.lng.toFixed(COORDINATE_DECIMAL_PLACES)}
+                <br />
+                {mapClickInfo.loading && "Resolving address..."}
+                {!mapClickInfo.loading && mapClickInfo.error && `Address lookup error: ${mapClickInfo.error}`}
+                {!mapClickInfo.loading && !mapClickInfo.error && mapClickInfo.address}
+              </div>
+            )}
+          </section>
 
           <section className="panel-block">
             <h2>Place details</h2>
