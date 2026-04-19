@@ -57,7 +57,7 @@ type MapClickInfo = {
 type FeedbackType = "success" | "error" | null;
 const RATING_DECIMAL_PLACES = 1;
 const COORDINATE_DECIMAL_PLACES = 6;
-const MAP_DRAG_THRESHOLD_PIXELS = 2;
+const MAP_DRAG_THRESHOLD_PIXELS = 6;
 const MAP_MIN_ZOOM_STEP = 0;
 const MAP_MAX_ZOOM_STEP = 5;
 const initialFormValues: FormValues = {
@@ -192,7 +192,7 @@ export default function Home() {
     placeId: null,
     message: "",
   });
-  const mapRef = useRef<HTMLElementTagNameMap["section"] | null>(null);
+  const mapRef = useRef<HTMLElement | null>(null);
   const mapDragStateRef = useRef<{ startX: number; startY: number; startCenter: Coordinates } | null>(null);
   const didMapDragRef = useRef(false);
   const mapClickRequestRef = useRef(0);
@@ -447,7 +447,10 @@ export default function Home() {
 
   const handleReportedPlaceClick = (place: Place) => {
     setMapClickInfoForPlace(place.name, place.lat, place.lng, place.address);
-    void openPlaceDialog(place);
+    void openPlaceDialog(place).catch(() => {
+      setFeedbackType("error");
+      setFeedbackMessage("Could not open place details.");
+    });
   };
 
   useEffect(() => {
@@ -455,7 +458,7 @@ export default function Home() {
       return;
     }
 
-    const handleWindowMouseMove = (event: globalThis.MouseEvent) => {
+    const handleMouseMove = (event: globalThis.MouseEvent) => {
       const dragState = mapDragStateRef.current;
       const mapRect = mapRef.current?.getBoundingClientRect();
       if (!dragState || !mapRect?.width || !mapRect.height) {
@@ -487,11 +490,11 @@ export default function Home() {
       setIsDraggingMap(false);
     };
 
-    window.addEventListener("mousemove", handleWindowMouseMove);
+    window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", stopDragging);
 
     return () => {
-      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", stopDragging);
     };
   }, [isDraggingMap, mapBounds.maxLat, mapBounds.maxLng, mapBounds.minLat, mapBounds.minLng, mapZoomStep]);
