@@ -57,6 +57,7 @@ type MapClickInfo = {
 type FeedbackType = "success" | "error" | null;
 const RATING_DECIMAL_PLACES = 1;
 const COORDINATE_DECIMAL_PLACES = 6;
+const MAP_DRAG_THRESHOLD_PIXELS = 2;
 const MAP_MIN_ZOOM_STEP = 0;
 const MAP_MAX_ZOOM_STEP = 5;
 const initialFormValues: FormValues = {
@@ -191,7 +192,7 @@ export default function Home() {
     placeId: null,
     message: "",
   });
-  const mapRef = useRef<HTMLElement | null>(null);
+  const mapRef = useRef<HTMLElementTagNameMap["section"] | null>(null);
   const mapDragStateRef = useRef<{ startX: number; startY: number; startCenter: Coordinates } | null>(null);
   const didMapDragRef = useRef(false);
   const mapClickRequestRef = useRef(0);
@@ -463,7 +464,7 @@ export default function Home() {
 
       const deltaX = event.clientX - dragState.startX;
       const deltaY = event.clientY - dragState.startY;
-      if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
+      if (Math.abs(deltaX) > MAP_DRAG_THRESHOLD_PIXELS || Math.abs(deltaY) > MAP_DRAG_THRESHOLD_PIXELS) {
         didMapDragRef.current = true;
       }
 
