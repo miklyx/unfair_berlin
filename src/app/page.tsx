@@ -335,31 +335,36 @@ export default function Home() {
   };
 
   const approveSubmission = (submissionId: number) => {
-    setPendingSubmissions((currentPending) => {
-      const submission = currentPending.find((item) => item.id === submissionId);
-      if (!submission) {
-        return currentPending;
+    const submission = pendingSubmissions.find((item) => item.id === submissionId);
+    if (!submission) {
+      return;
+    }
+
+    setPlaces((currentPlaces) => {
+      if (currentPlaces.some((p) => p.id === submission.id)) {
+        return currentPlaces;
       }
-
-      const newPlace: Place = {
-        id: submission.id,
-        name: submission.name,
-        address: submission.address,
-        lat: submission.lat,
-        lng: submission.lng,
-        deletedCount: submission.deletedCount,
-        platform: submission.platform,
-        notes: submission.notes,
-        googleRating: null,
-        googleReviewCount: null,
-      };
-
-      setPlaces((currentPlaces) => [...currentPlaces, newPlace]);
-      setSelectedPlaceId(submission.id);
-      setFlyToPlaceId(submission.id);
-
-      return currentPending.filter((item) => item.id !== submissionId);
+      return [
+        ...currentPlaces,
+        {
+          id: submission.id,
+          name: submission.name,
+          address: submission.address,
+          lat: submission.lat,
+          lng: submission.lng,
+          deletedCount: submission.deletedCount,
+          platform: submission.platform,
+          notes: submission.notes,
+          googleRating: null,
+          googleReviewCount: null,
+        },
+      ];
     });
+    setSelectedPlaceId(submission.id);
+    setFlyToPlaceId(submission.id);
+    setPendingSubmissions((currentPending) =>
+      currentPending.filter((item) => item.id !== submissionId),
+    );
   };
 
   const rejectSubmission = (submissionId: number) => {
@@ -766,6 +771,23 @@ export default function Home() {
             {ratingErrorState.placeId === dialogPlace.id && ratingErrorState.message && (
               <p className="place-dialog-error">{ratingErrorState.message}</p>
             )}
+            <button
+              type="button"
+              className="place-dialog-add"
+              onClick={() => {
+                closePlaceDialog();
+                setFormValues((current) => ({
+                  ...current,
+                  name: dialogPlace.name,
+                  address: dialogPlace.address,
+                  lat: dialogPlace.lat.toFixed(COORDINATE_DECIMAL_PLACES),
+                  lng: dialogPlace.lng.toFixed(COORDINATE_DECIMAL_PLACES),
+                }));
+                setIsSubmissionFormOpen(true);
+              }}
+            >
+              Add place
+            </button>
           </div>
         </div>
       )}
