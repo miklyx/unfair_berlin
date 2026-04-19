@@ -492,8 +492,8 @@ test("11 – add/pan/zoom cycle can be repeated without console errors", async (
     await submitAndApprovePlace(page, {
       name: `Stabilitätstest ${i}`,
       address: `Teststraße ${i}, Berlin`,
-      lat: `52.${5100 + i * 10}`,
-      lng: `13.${3900 + i * 10}`,
+      lat: (52.51 + i * 0.01).toFixed(4),
+      lng: (13.39 + i * 0.01).toFixed(4),
     });
 
     // Zoom in
