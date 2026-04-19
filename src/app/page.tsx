@@ -524,6 +524,9 @@ export default function Home() {
                 ▸
               </span>
               Submit a place
+              <span className="sr-only">
+                {isSubmissionFormOpen ? " (expanded)" : " (collapsed)"}
+              </span>
             </button>
             {isSubmissionFormOpen && (
               <form id="submit-place-panel" onSubmit={handleSubmit}>
