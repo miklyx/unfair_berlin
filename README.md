@@ -1,6 +1,6 @@
 # unfair_berlin
 
-This is a **Copilot test** project built with **Next.js** and **SQLite**.
+Next.js приложение с интерактивной картой Берлина для фиксации мест, где удаляют честные негативные отзывы.
 
 ## Run
 
@@ -9,12 +9,11 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000.
+Откройте http://localhost:3000.
 
-## What's inside
+## Что внутри
 
-- `src/app/page.tsx` — main page with data from SQLite
-- `src/app/api/notes/route.ts` — API route `/api/notes`
-- `src/lib/db.ts` — SQLite initialization and queries
-
-The database file is created automatically: `data/app.db`.
+- `src/app/page.tsx` — карта, пины, форма отправки, очередь модерации и статистика
+- `src/app/globals.css` — стили интерфейса карты и панелей
+- `src/app/api/notes/route.ts` — API endpoint `/api/notes`
+- `src/lib/db.ts` — инициализация SQLite и запросы
