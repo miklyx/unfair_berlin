@@ -722,7 +722,43 @@ export default function Home() {
             aria-label="Place pins"
             onClick={handleMapClick}
             onMouseDown={handleMapMouseDown}
-          />
+          >
+            {osmPlaces.map((place) => (
+              <button
+                key={place.id}
+                type="button"
+                className="map-pin map-pin-muted"
+                style={getMarkerPosition(place, mapBounds)}
+                title={place.name}
+                aria-label={place.name}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOsmPlaceClick(place);
+                }}
+              />
+            ))}
+            {places.map((place) => (
+              <button
+                key={place.id}
+                type="button"
+                className={`map-pin${place.id === selectedPlaceId ? " selected" : ""}`}
+                style={getMarkerPosition(place, mapBounds)}
+                title={`${place.name} — ${place.deletedCount} deleted reviews`}
+                aria-label={`${place.name} — ${place.deletedCount} deleted reviews`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleReportedPlaceClick(place);
+                }}
+              />
+            ))}
+            {mapSelection && (
+              <div
+                className={`map-selection-pin${mapSelectionLoading ? " loading" : ""}`}
+                style={getMarkerPosition(mapSelection, mapBounds)}
+                aria-hidden="true"
+              />
+            )}
+          </div>
           <div className="map-zoom-controls" aria-label="Map zoom controls">
             <button type="button" onClick={zoomInMap} aria-label="Zoom in" disabled={mapZoomStep >= MAP_MAX_ZOOM_STEP}>
               +
@@ -970,14 +1006,18 @@ export default function Home() {
           role="dialog"
           aria-modal="true"
           aria-label={`Details for ${dialogPlace.name}`}
+          onClick={closePlaceDialog}
         >
-          <div className="place-dialog">
+          <div className="place-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="place-dialog-header">
               <h3>{dialogPlace.name}</h3>
               <button type="button" className="place-dialog-close" onClick={closePlaceDialog}>
                 Close
               </button>
             </div>
+            <p>
+              Address: <strong>{dialogPlace.address}</strong>
+            </p>
             <p>
               Google Maps rating:{" "}
               <strong>
@@ -1001,6 +1041,23 @@ export default function Home() {
             {ratingErrorState.placeId === dialogPlace.id && ratingErrorState.message && (
               <p className="place-dialog-error">{ratingErrorState.message}</p>
             )}
+            <button
+              type="button"
+              className="place-dialog-add"
+              onClick={() => {
+                closePlaceDialog();
+                setFormValues((current) => ({
+                  ...current,
+                  name: dialogPlace.name,
+                  address: dialogPlace.address,
+                  lat: dialogPlace.lat.toFixed(COORDINATE_DECIMAL_PLACES),
+                  lng: dialogPlace.lng.toFixed(COORDINATE_DECIMAL_PLACES),
+                }));
+                setIsSubmissionFormOpen(true);
+              }}
+            >
+              Add place
+            </button>
           </div>
         </div>
       )}
