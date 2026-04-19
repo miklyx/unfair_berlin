@@ -11,6 +11,8 @@ type Place = {
   deletedCount: number;
   platform: string;
   notes: string;
+  googleRating: number | null;
+  googleReviewCount: number | null;
 };
 
 type Submission = Place & {
@@ -18,6 +20,7 @@ type Submission = Place & {
 };
 
 type FeedbackType = "success" | "error" | null;
+const RATING_DECIMAL_PLACES = 1;
 
 const initialPlaces: Place[] = [
   {
@@ -29,6 +32,8 @@ const initialPlaces: Place[] = [
     deletedCount: 8,
     platform: "Google Maps",
     notes: "Multiple users reported review removals after legal threat emails.",
+    googleRating: null,
+    googleReviewCount: null,
   },
   {
     id: 2,
@@ -39,6 +44,8 @@ const initialPlaces: Place[] = [
     deletedCount: 5,
     platform: "Tripadvisor",
     notes: "Users shared screenshots of platform notices confirming deletion.",
+    googleRating: null,
+    googleReviewCount: null,
   },
 ];
 
@@ -79,10 +86,21 @@ export default function Home() {
   );
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackType, setFeedbackType] = useState<FeedbackType>(null);
+  const [dialogPlaceId, setDialogPlaceId] = useState<number | null>(null);
+  const [ratingLoadingPlaceId, setRatingLoadingPlaceId] = useState<number | null>(null);
+  const [ratingErrorState, setRatingErrorState] = useState<{ placeId: number | null; message: string }>({
+    placeId: null,
+    message: "",
+  });
 
   const selectedPlace = useMemo(
     () => places.find((place) => place.id === selectedPlaceId) ?? null,
     [places, selectedPlaceId],
+  );
+
+  const dialogPlace = useMemo(
+    () => places.find((place) => place.id === dialogPlaceId) ?? null,
+    [dialogPlaceId, places],
   );
 
   const topPlaces = useMemo(
@@ -113,6 +131,8 @@ export default function Home() {
           deletedCount: submission.deletedCount,
           platform: submission.platform,
           notes: submission.notes,
+          googleRating: null,
+          googleReviewCount: null,
         },
       ]);
       setSelectedPlaceId(submission.id);
@@ -122,6 +142,58 @@ export default function Home() {
 
   const rejectSubmission = (submissionId: number) => {
     setPendingSubmissions((currentPending) => currentPending.filter((item) => item.id !== submissionId));
+  };
+
+  const closePlaceDialog = () => {
+    setDialogPlaceId(null);
+    setRatingLoadingPlaceId(null);
+    setRatingErrorState({ placeId: null, message: "" });
+  };
+
+  const openPlaceDialog = async (place: Place) => {
+    setSelectedPlaceId(place.id);
+    setDialogPlaceId(place.id);
+    setRatingErrorState({ placeId: null, message: "" });
+
+    if (place.googleRating !== null && place.googleReviewCount !== null) {
+      return;
+    }
+
+    setRatingLoadingPlaceId(place.id);
+
+    try {
+      const response = await fetch(
+        `/api/google-rating?name=${encodeURIComponent(place.name)}&address=${encodeURIComponent(place.address)}`,
+      );
+      if (!response.ok) {
+        const errorPayload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(errorPayload?.error ?? `Failed to load rating (HTTP ${response.status})`);
+      }
+
+      const payload = (await response.json()) as {
+        rating: number | null;
+        reviewCount: number | null;
+      };
+
+      setPlaces((currentPlaces) =>
+        currentPlaces.map((currentPlace) =>
+          currentPlace.id === place.id
+            ? {
+                ...currentPlace,
+                googleRating: payload.rating,
+                googleReviewCount: payload.reviewCount,
+              }
+            : currentPlace,
+        ),
+      );
+    } catch (error) {
+      setRatingErrorState({
+        placeId: place.id,
+        message: error instanceof Error ? error.message : "Could not load Google Maps rating.",
+      });
+    } finally {
+      setRatingLoadingPlaceId(null);
+    }
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -177,6 +249,8 @@ export default function Home() {
       deletedCount,
       platform,
       notes,
+      googleRating: null,
+      googleReviewCount: null,
       proofName: proof.name,
     };
 
@@ -211,7 +285,9 @@ export default function Home() {
                     style={markerPosition}
                     title={title}
                     aria-label={title}
-                    onClick={() => setSelectedPlaceId(place.id)}
+                    onClick={() => {
+                      openPlaceDialog(place);
+                    }}
                   />
                 );
               })}
@@ -367,6 +443,47 @@ export default function Home() {
           ))}
         </ul>
       </section>
+
+      {dialogPlace && (
+        <div
+          className="place-dialog-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Details for ${dialogPlace.name}`}
+        >
+          <div className="place-dialog">
+            <div className="place-dialog-header">
+              <h3>{dialogPlace.name}</h3>
+              <button type="button" className="place-dialog-close" onClick={closePlaceDialog}>
+                Close
+              </button>
+            </div>
+            <p>
+              Google Maps rating:{" "}
+              <strong>
+                {dialogPlace.googleRating !== null
+                  ? dialogPlace.googleRating.toFixed(RATING_DECIMAL_PLACES)
+                  : "Not available"}
+              </strong>
+            </p>
+            <p>
+              Google reviews:{" "}
+              <strong>
+                {dialogPlace.googleReviewCount !== null
+                  ? dialogPlace.googleReviewCount.toLocaleString()
+                  : "Not available"}
+              </strong>
+            </p>
+            <p>
+              Deleted reviews: <strong>{dialogPlace.deletedCount}</strong>
+            </p>
+            {ratingLoadingPlaceId === dialogPlace.id && <p className="place-dialog-meta">Loading rating…</p>}
+            {ratingErrorState.placeId === dialogPlace.id && ratingErrorState.message && (
+              <p className="place-dialog-error">{ratingErrorState.message}</p>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }
