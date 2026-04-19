@@ -117,11 +117,28 @@ function isWithinBerlinBounds(lat: number, lng: number) {
   return isWithinBounds(lat, lng, berlinBounds);
 }
 
+function latToMercatorY(lat: number) {
+  const boundedLat = Math.min(Math.max(lat, -85.05112878), 85.05112878);
+  const latRadians = (boundedLat * Math.PI) / 180;
+  return Math.log(Math.tan(Math.PI / 4 + latRadians / 2));
+}
+
+function mercatorYToLat(mercatorY: number) {
+  return (Math.atan(Math.sinh(mercatorY)) * 180) / Math.PI;
+}
+
+const berlinMercatorBounds = {
+  minY: latToMercatorY(berlinBounds.minLat),
+  maxY: latToMercatorY(berlinBounds.maxLat),
+};
+
 function getMarkerPosition(coords: Coordinates, bounds: MapBounds) {
+  const minY = latToMercatorY(bounds.minLat);
+  const maxY = latToMercatorY(bounds.maxLat);
+  const coordsY = latToMercatorY(coords.lat);
   const lngRatio =
     (coords.lng - bounds.minLng) / (bounds.maxLng - bounds.minLng);
-  const latRatio =
-    (bounds.maxLat - coords.lat) / (bounds.maxLat - bounds.minLat);
+  const latRatio = (maxY - coordsY) / (maxY - minY);
 
   return {
     left: `${lngRatio * 100}%`,
@@ -131,35 +148,40 @@ function getMarkerPosition(coords: Coordinates, bounds: MapBounds) {
 
 function getMapSpanForZoomStep(zoomStep: number) {
   const lngSpan = (berlinBounds.maxLng - berlinBounds.minLng) / 2 ** zoomStep;
-  const latSpan = (berlinBounds.maxLat - berlinBounds.minLat) / 2 ** zoomStep;
+  const ySpan = (berlinMercatorBounds.maxY - berlinMercatorBounds.minY) / 2 ** zoomStep;
 
   return {
     lngSpan,
-    latSpan,
+    ySpan,
   };
 }
 
 function getMapBoundsForViewport(center: Coordinates, zoomStep: number): MapBounds {
-  const { lngSpan, latSpan } = getMapSpanForZoomStep(zoomStep);
+  const { lngSpan, ySpan } = getMapSpanForZoomStep(zoomStep);
+  const centerY = latToMercatorY(center.lat);
+  const minY = centerY - ySpan / 2;
+  const maxY = centerY + ySpan / 2;
 
   return {
     minLng: center.lng - lngSpan / 2,
     maxLng: center.lng + lngSpan / 2,
-    minLat: center.lat - latSpan / 2,
-    maxLat: center.lat + latSpan / 2,
+    minLat: mercatorYToLat(minY),
+    maxLat: mercatorYToLat(maxY),
   };
 }
 
 function clampMapCenter(center: Coordinates, zoomStep: number) {
-  const { lngSpan, latSpan } = getMapSpanForZoomStep(zoomStep);
+  const { lngSpan, ySpan } = getMapSpanForZoomStep(zoomStep);
   const minCenterLng = berlinBounds.minLng + lngSpan / 2;
   const maxCenterLng = berlinBounds.maxLng - lngSpan / 2;
-  const minCenterLat = berlinBounds.minLat + latSpan / 2;
-  const maxCenterLat = berlinBounds.maxLat - latSpan / 2;
+  const minCenterY = berlinMercatorBounds.minY + ySpan / 2;
+  const maxCenterY = berlinMercatorBounds.maxY - ySpan / 2;
+  const centerY = latToMercatorY(center.lat);
+  const clampedCenterY = Math.min(Math.max(centerY, minCenterY), maxCenterY);
 
   return {
     lng: Math.min(Math.max(center.lng, minCenterLng), maxCenterLng),
-    lat: Math.min(Math.max(center.lat, minCenterLat), maxCenterLat),
+    lat: mercatorYToLat(clampedCenterY),
   };
 }
 
@@ -424,7 +446,9 @@ export default function Home() {
     const xRatio = (event.clientX - rect.left) / rect.width;
     const yRatio = (event.clientY - rect.top) / rect.height;
     const lng = mapBounds.minLng + xRatio * (mapBounds.maxLng - mapBounds.minLng);
-    const lat = mapBounds.maxLat - yRatio * (mapBounds.maxLat - mapBounds.minLat);
+    const minY = latToMercatorY(mapBounds.minLat);
+    const maxY = latToMercatorY(mapBounds.maxLat);
+    const lat = mercatorYToLat(maxY - yRatio * (maxY - minY));
 
     if (isMapPickMode) {
       setIsMapPickMode(false);
@@ -475,13 +499,16 @@ export default function Home() {
       }
 
       const lngPerPixel = (mapBounds.maxLng - mapBounds.minLng) / mapRect.width;
-      const latPerPixel = (mapBounds.maxLat - mapBounds.minLat) / mapRect.height;
+      const minY = latToMercatorY(mapBounds.minLat);
+      const maxY = latToMercatorY(mapBounds.maxLat);
+      const yPerPixel = (maxY - minY) / mapRect.height;
+      const startCenterY = latToMercatorY(dragState.startCenter.lat);
 
       setMapCenter(
         clampMapCenter(
           {
             lng: dragState.startCenter.lng - deltaX * lngPerPixel,
-            lat: dragState.startCenter.lat + deltaY * latPerPixel,
+            lat: mercatorYToLat(startCenterY + deltaY * yPerPixel),
           },
           mapZoomStep,
         ),
