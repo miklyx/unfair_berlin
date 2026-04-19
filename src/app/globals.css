@@ -38,17 +38,22 @@ body {
   width: 100%;
   height: 100%;
   border: 0;
+  pointer-events: none;
 }
 
 .pin-layer {
   position: absolute;
   inset: 0;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: grab;
 }
 
 .pin-layer.picking {
-  pointer-events: auto;
   cursor: crosshair;
+}
+
+.pin-layer.dragging {
+  cursor: grabbing;
 }
 
 .map-pin {
