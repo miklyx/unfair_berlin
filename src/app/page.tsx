@@ -207,7 +207,9 @@ export default function Home() {
   const [isMapPickMode, setIsMapPickMode] = useState(false);
   const [mapZoomStep, setMapZoomStep] = useState(MAP_MIN_ZOOM_STEP);
   const [mapCenter, setMapCenter] = useState<Coordinates>({
-    lat: (berlinBounds.minLat + berlinBounds.maxLat) / 2,
+    // Use the Mercator midpoint so that clampMapCenter at zoom 0 returns
+    // to the same value (avoiding drift after a zoom-in + zoom-out cycle).
+    lat: mercatorYToLat((berlinMercatorBounds.minY + berlinMercatorBounds.maxY) / 2),
     lng: (berlinBounds.minLng + berlinBounds.maxLng) / 2,
   });
   const [isDraggingMap, setIsDraggingMap] = useState(false);
@@ -553,13 +555,16 @@ export default function Home() {
   }, [isDraggingMap]);
 
   const approveSubmission = (submissionId: number) => {
-    setPendingSubmissions((currentPending) => {
-      const submission = currentPending.find((item) => item.id === submissionId);
-      if (!submission) {
-        return currentPending;
-      }
+    const submission = pendingSubmissions.find((item) => item.id === submissionId);
+    if (!submission) {
+      return;
+    }
 
-      setPlaces((currentPlaces) => [
+    setPlaces((currentPlaces) => {
+      if (currentPlaces.some((p) => p.id === submission.id)) {
+        return currentPlaces;
+      }
+      return [
         ...currentPlaces,
         {
           id: submission.id,
@@ -573,10 +578,12 @@ export default function Home() {
           googleRating: null,
           googleReviewCount: null,
         },
-      ]);
-      setSelectedPlaceId(submission.id);
-      return currentPending.filter((item) => item.id !== submissionId);
+      ];
     });
+    setSelectedPlaceId(submission.id);
+    setPendingSubmissions((currentPending) =>
+      currentPending.filter((item) => item.id !== submissionId),
+    );
   };
 
   const rejectSubmission = (submissionId: number) => {
@@ -722,7 +729,43 @@ export default function Home() {
             aria-label="Place pins"
             onClick={handleMapClick}
             onMouseDown={handleMapMouseDown}
-          />
+          >
+            {osmPlaces.map((place) => (
+              <button
+                key={place.id}
+                type="button"
+                className="map-pin map-pin-muted"
+                style={getMarkerPosition(place, mapBounds)}
+                title={place.name}
+                aria-label={place.name}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOsmPlaceClick(place);
+                }}
+              />
+            ))}
+            {places.map((place) => (
+              <button
+                key={place.id}
+                type="button"
+                className={`map-pin${place.id === selectedPlaceId ? " selected" : ""}`}
+                style={getMarkerPosition(place, mapBounds)}
+                title={`${place.name} — ${place.deletedCount} deleted reviews`}
+                aria-label={`${place.name} — ${place.deletedCount} deleted reviews`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleReportedPlaceClick(place);
+                }}
+              />
+            ))}
+            {mapSelection && (
+              <div
+                className={`map-selection-pin${mapSelectionLoading ? " loading" : ""}`}
+                style={getMarkerPosition(mapSelection, mapBounds)}
+                aria-hidden="true"
+              />
+            )}
+          </div>
           <div className="map-zoom-controls" aria-label="Map zoom controls">
             <button type="button" onClick={zoomInMap} aria-label="Zoom in" disabled={mapZoomStep >= MAP_MAX_ZOOM_STEP}>
               +
@@ -970,14 +1013,18 @@ export default function Home() {
           role="dialog"
           aria-modal="true"
           aria-label={`Details for ${dialogPlace.name}`}
+          onClick={closePlaceDialog}
         >
-          <div className="place-dialog">
+          <div className="place-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="place-dialog-header">
               <h3>{dialogPlace.name}</h3>
               <button type="button" className="place-dialog-close" onClick={closePlaceDialog}>
                 Close
               </button>
             </div>
+            <p>
+              Address: <strong>{dialogPlace.address}</strong>
+            </p>
             <p>
               Google Maps rating:{" "}
               <strong>
@@ -1001,6 +1048,23 @@ export default function Home() {
             {ratingErrorState.placeId === dialogPlace.id && ratingErrorState.message && (
               <p className="place-dialog-error">{ratingErrorState.message}</p>
             )}
+            <button
+              type="button"
+              className="place-dialog-add"
+              onClick={() => {
+                closePlaceDialog();
+                setFormValues((current) => ({
+                  ...current,
+                  name: dialogPlace.name,
+                  address: dialogPlace.address,
+                  lat: dialogPlace.lat.toFixed(COORDINATE_DECIMAL_PLACES),
+                  lng: dialogPlace.lng.toFixed(COORDINATE_DECIMAL_PLACES),
+                }));
+                setIsSubmissionFormOpen(true);
+              }}
+            >
+              Add place
+            </button>
           </div>
         </div>
       )}
