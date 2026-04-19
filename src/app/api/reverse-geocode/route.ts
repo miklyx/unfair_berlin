@@ -48,10 +48,9 @@ export async function GET(request: NextRequest) {
 
     const payload = (await response.json()) as {
       display_name?: string;
-      name?: string;
     };
 
-    const address = payload.display_name?.trim() || payload.name?.trim() || "Address unavailable";
+    const address = payload.display_name?.trim() || "Address unavailable";
 
     return NextResponse.json({ address });
   } catch (error) {

@@ -38,6 +38,8 @@ type FormValues = {
   notes: string;
 };
 
+type Coordinates = { lat: number; lng: number };
+
 type FeedbackType = "success" | "error" | null;
 const RATING_DECIMAL_PLACES = 1;
 const COORDINATE_DECIMAL_PLACES = 6;
@@ -94,11 +96,11 @@ function isWithinBerlinBounds(lat: number, lng: number) {
   );
 }
 
-function getMarkerPosition(place: Place) {
+function getMarkerPosition(coords: Coordinates) {
   const lngRatio =
-    (place.lng - berlinBounds.minLng) / (berlinBounds.maxLng - berlinBounds.minLng);
+    (coords.lng - berlinBounds.minLng) / (berlinBounds.maxLng - berlinBounds.minLng);
   const latRatio =
-    (berlinBounds.maxLat - place.lat) / (berlinBounds.maxLat - berlinBounds.minLat);
+    (berlinBounds.maxLat - coords.lat) / (berlinBounds.maxLat - berlinBounds.minLat);
 
   return {
     left: `${lngRatio * 100}%`,
@@ -223,6 +225,7 @@ export default function Home() {
   };
 
   const handleMapClick = (event: MouseEvent<HTMLDivElement>) => {
+    // Ignore clicks on map pins; only bare-map clicks should prefill coordinates.
     if (event.target !== event.currentTarget) {
       return;
     }
@@ -416,18 +419,7 @@ export default function Home() {
             {osmPlaces
               .filter((place) => isWithinBerlinBounds(place.lat, place.lng))
               .map((place) => {
-                const markerPosition = getMarkerPosition({
-                  id: 0,
-                  name: place.name,
-                  address: place.address,
-                  lat: place.lat,
-                  lng: place.lng,
-                  deletedCount: 0,
-                  platform: "OSM",
-                  notes: "",
-                  googleRating: null,
-                  googleReviewCount: null,
-                });
+                const osmMarkerPosition = getMarkerPosition(place);
                 const title = `${place.name} (${place.amenity})`;
 
                 return (
@@ -435,7 +427,7 @@ export default function Home() {
                     key={place.id}
                     type="button"
                     className="map-pin map-pin-muted"
-                    style={markerPosition}
+                    style={osmMarkerPosition}
                     title={title}
                     aria-label={title}
                     onClick={(event) => {
@@ -448,7 +440,7 @@ export default function Home() {
             {places
               .filter((place) => isWithinBerlinBounds(place.lat, place.lng))
               .map((place) => {
-                const markerPosition = getMarkerPosition(place);
+                const placeMarkerPosition = getMarkerPosition(place);
                 const title = `${place.name} — ${place.deletedCount} deleted reviews`;
 
                 return (
@@ -456,7 +448,7 @@ export default function Home() {
                     key={place.id}
                     type="button"
                     className={`map-pin${selectedPlaceId === place.id ? " selected" : ""}`}
-                    style={markerPosition}
+                    style={placeMarkerPosition}
                     title={title}
                     aria-label={title}
                     onClick={(event) => {
@@ -469,18 +461,7 @@ export default function Home() {
             {mapSelection && (
               <span
                 className={`map-selection-pin${mapSelectionLoading ? " loading" : ""}`}
-                style={getMarkerPosition({
-                  id: -1,
-                  name: "Selected map point",
-                  address: "",
-                  lat: mapSelection.lat,
-                  lng: mapSelection.lng,
-                  deletedCount: 0,
-                  platform: "",
-                  notes: "",
-                  googleRating: null,
-                  googleReviewCount: null,
-                })}
+                style={getMarkerPosition(mapSelection)}
                 aria-label="Selected coordinates"
               />
             )}
@@ -491,7 +472,8 @@ export default function Home() {
           <h1>Unfair Berlin</h1>
           <p className="intro">Community map of Berlin places reported for deleting fair negative reviews.</p>
           <p className="map-hint">
-            Click map to fill address and coordinates, or click muted OSM places (cafés, restaurants, bars, clubs).
+            Click map to fill address and coordinates, or click muted OSM places (cafes, restaurants, bars, pubs,
+            nightclubs).
           </p>
           {osmError && <p className="form-feedback error">{osmError}</p>}
 

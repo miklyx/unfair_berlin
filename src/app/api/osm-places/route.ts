@@ -14,6 +14,8 @@ type OverpassElement = {
 
 const BERLIN_BBOX = "52.3383,13.0883,52.6755,13.7612";
 const OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
+// 700 keeps the initial payload/render time reasonable while still showing broad city coverage.
+const MAX_OSM_PLACES = 700;
 
 function buildAddress(tags: Record<string, string | undefined> | undefined) {
   if (!tags) {
@@ -39,7 +41,7 @@ export async function GET() {
 (
   nwr["amenity"~"^(cafe|restaurant|bar|pub|nightclub)$"](${BERLIN_BBOX});
 );
-out center 700;
+out center ${MAX_OSM_PLACES};
 `;
 
   try {
@@ -74,7 +76,7 @@ out center 700;
         return {
           id: `${element.type}-${element.id}`,
           name: tags.name?.trim() || "Unnamed place",
-          address: address || tags["addr:full"] || "Address unavailable",
+          address: address || "Address unavailable",
           lat,
           lng,
           amenity,
