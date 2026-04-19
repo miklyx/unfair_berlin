@@ -207,7 +207,9 @@ export default function Home() {
   const [isMapPickMode, setIsMapPickMode] = useState(false);
   const [mapZoomStep, setMapZoomStep] = useState(MAP_MIN_ZOOM_STEP);
   const [mapCenter, setMapCenter] = useState<Coordinates>({
-    lat: (berlinBounds.minLat + berlinBounds.maxLat) / 2,
+    // Use the Mercator midpoint so that clampMapCenter at zoom 0 returns
+    // to the same value (avoiding drift after a zoom-in + zoom-out cycle).
+    lat: mercatorYToLat((berlinMercatorBounds.minY + berlinMercatorBounds.maxY) / 2),
     lng: (berlinBounds.minLng + berlinBounds.maxLng) / 2,
   });
   const [isDraggingMap, setIsDraggingMap] = useState(false);
@@ -553,13 +555,16 @@ export default function Home() {
   }, [isDraggingMap]);
 
   const approveSubmission = (submissionId: number) => {
-    setPendingSubmissions((currentPending) => {
-      const submission = currentPending.find((item) => item.id === submissionId);
-      if (!submission) {
-        return currentPending;
-      }
+    const submission = pendingSubmissions.find((item) => item.id === submissionId);
+    if (!submission) {
+      return;
+    }
 
-      setPlaces((currentPlaces) => [
+    setPlaces((currentPlaces) => {
+      if (currentPlaces.some((p) => p.id === submission.id)) {
+        return currentPlaces;
+      }
+      return [
         ...currentPlaces,
         {
           id: submission.id,
@@ -573,10 +578,12 @@ export default function Home() {
           googleRating: null,
           googleReviewCount: null,
         },
-      ]);
-      setSelectedPlaceId(submission.id);
-      return currentPending.filter((item) => item.id !== submissionId);
+      ];
     });
+    setSelectedPlaceId(submission.id);
+    setPendingSubmissions((currentPending) =>
+      currentPending.filter((item) => item.id !== submissionId),
+    );
   };
 
   const rejectSubmission = (submissionId: number) => {

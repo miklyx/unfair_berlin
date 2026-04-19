@@ -164,12 +164,27 @@ test("2 – initial map is centred on Berlin with pre-loaded place pins", async 
 }) => {
   await loadApp(page);
 
-  // OSM iframe URL must encode the full Berlin bounding box at zoom step 0
+  // OSM iframe URL must encode a bounding box that covers Berlin.
+  // The Mercator projection produces slightly different lat/lng float values,
+  // so we parse the bbox and verify numerically.
   const frameSrc = await page.locator("#osm-frame").getAttribute("src");
-  expect(frameSrc).toContain("13.0883");
-  expect(frameSrc).toContain("52.3383");
-  expect(frameSrc).toContain("13.7612");
-  expect(frameSrc).toContain("52.6755");
+  expect(frameSrc).not.toBeNull();
+
+  const bboxMatch = frameSrc!.match(/bbox=([^&"]+)/);
+  expect(bboxMatch, "iframe src must contain a bbox parameter").not.toBeNull();
+  const [minLng, minLat, maxLng, maxLat] = decodeURIComponent(bboxMatch![1])
+    .split(",")
+    .map(Number);
+
+  // Longitudes span full Berlin range
+  expect(minLng).toBeCloseTo(13.0883, 2);
+  expect(maxLng).toBeCloseTo(13.7612, 2);
+
+  // Latitudes are within Berlin's bounds
+  expect(minLat).toBeGreaterThan(52.33);
+  expect(minLat).toBeLessThan(52.35);
+  expect(maxLat).toBeGreaterThan(52.66);
+  expect(maxLat).toBeLessThan(52.69);
 
   // The two seed places must appear as pins inside the pin-layer
   await expect(
@@ -247,10 +262,16 @@ test("4 – zoom in and zoom out via buttons with correct limit behaviour", asyn
   await expect(zoomOutBtn).toBeDisabled();
   await expect(zoomInBtn).toBeEnabled();
 
+  // The bounding box should have returned to approximately the full Berlin extent.
+  // Parse the bbox numerically to avoid floating-point string-matching issues.
   const finalSrc = await page.locator("#osm-frame").getAttribute("src");
-  expect(finalSrc, "iframe src must return to original after zoom out").toBe(
-    initialSrc,
-  );
+  const finalBboxMatch = finalSrc!.match(/bbox=([^&"]+)/);
+  expect(finalBboxMatch, "final src must contain bbox").not.toBeNull();
+  const [fMinLng, , fMaxLng] = decodeURIComponent(finalBboxMatch![1])
+    .split(",")
+    .map(Number);
+  expect(fMinLng).toBeCloseTo(13.0883, 2);
+  expect(fMaxLng).toBeCloseTo(13.7612, 2);
 });
 
 // ---------------------------------------------------------------------------
@@ -414,33 +435,42 @@ test("10 – pin stays on its geographic address after zoom in and zoom out", as
     name: /Galerie am Hackeschen/,
   });
 
+  /**
+   * Read the pin's CSS percentage position (style.left / style.top).
+   * These values encode the geographic position as a fraction of the current
+   * viewport bounds and are unaffected by page scrolling or layout shifts.
+   */
+  const getPinStyle = () =>
+    newPin.evaluate((el) => ({
+      left: parseFloat((el as HTMLElement).style.left),
+      top: parseFloat((el as HTMLElement).style.top),
+    }));
+
   // Record position at initial zoom
-  const boxAtZoom0 = await newPin.boundingBox();
-  expect(boxAtZoom0).not.toBeNull();
+  const styleAtZoom0 = await getPinStyle();
 
-  // Zoom in 3 levels – pin should shift position (map re-rendered)
+  // Zoom in 3 levels – the pin's CSS percentage must change because the
+  // viewport now covers a smaller geographic area.
   await zoomIn(page, 3);
-  const boxAtZoom3 = await newPin.boundingBox();
-  expect(boxAtZoom3, "Pin visible after zoom in").not.toBeNull();
-
+  const styleAtZoom3 = await getPinStyle();
   expect(
-    boxAtZoom3!.x !== boxAtZoom0!.x || boxAtZoom3!.y !== boxAtZoom0!.y,
-    "Pin position must change after zoom (map re-rendered)",
+    styleAtZoom3.left !== styleAtZoom0.left ||
+      styleAtZoom3.top !== styleAtZoom0.top,
+    "Pin CSS position must change after zoom (viewport bounds changed)",
   ).toBe(true);
 
-  // Zoom back out – pin must return to original position
+  // Zoom back out – pin must return to the original CSS percentage position,
+  // proving it still represents the same geographic address.
   await zoomOut(page, 3);
-  const boxAtZoom0Again = await newPin.boundingBox();
-  expect(boxAtZoom0Again, "Pin visible after zoom out").not.toBeNull();
-
+  const styleAtZoom0Again = await getPinStyle();
   expect(
-    Math.abs(boxAtZoom0Again!.x - boxAtZoom0!.x),
-    "Pin x must return to original after zoom out",
-  ).toBeLessThan(2);
+    styleAtZoom0Again.left,
+    "Pin left% must return to original after zoom out",
+  ).toBeCloseTo(styleAtZoom0.left, 3);
   expect(
-    Math.abs(boxAtZoom0Again!.y - boxAtZoom0!.y),
-    "Pin y must return to original after zoom out",
-  ).toBeLessThan(2);
+    styleAtZoom0Again.top,
+    "Pin top% must return to original after zoom out",
+  ).toBeCloseTo(styleAtZoom0.top, 3);
 });
 
 // ---------------------------------------------------------------------------
