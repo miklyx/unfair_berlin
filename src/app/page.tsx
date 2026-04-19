@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, MouseEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, MouseEvent, WheelEvent, useEffect, useMemo, useState } from "react";
 
 type Place = {
   id: number;
@@ -39,10 +39,18 @@ type FormValues = {
 };
 
 type Coordinates = { lat: number; lng: number };
+type MapBounds = {
+  minLng: number;
+  maxLng: number;
+  minLat: number;
+  maxLat: number;
+};
 
 type FeedbackType = "success" | "error" | null;
 const RATING_DECIMAL_PLACES = 1;
 const COORDINATE_DECIMAL_PLACES = 6;
+const MAP_MIN_ZOOM_STEP = 0;
+const MAP_MAX_ZOOM_STEP = 5;
 const initialFormValues: FormValues = {
   name: "",
   address: "",
@@ -80,31 +88,49 @@ const initialPlaces: Place[] = [
   },
 ];
 
-const berlinBounds = {
+const berlinBounds: MapBounds = {
   minLng: 13.0883,
   maxLng: 13.7612,
   minLat: 52.3383,
   maxLat: 52.6755,
 };
 
-function isWithinBerlinBounds(lat: number, lng: number) {
+function isWithinBounds(lat: number, lng: number, bounds: MapBounds) {
   return (
-    lat >= berlinBounds.minLat &&
-    lat <= berlinBounds.maxLat &&
-    lng >= berlinBounds.minLng &&
-    lng <= berlinBounds.maxLng
+    lat >= bounds.minLat &&
+    lat <= bounds.maxLat &&
+    lng >= bounds.minLng &&
+    lng <= bounds.maxLng
   );
 }
 
-function getMarkerPosition(coords: Coordinates) {
+function isWithinBerlinBounds(lat: number, lng: number) {
+  return isWithinBounds(lat, lng, berlinBounds);
+}
+
+function getMarkerPosition(coords: Coordinates, bounds: MapBounds) {
   const lngRatio =
-    (coords.lng - berlinBounds.minLng) / (berlinBounds.maxLng - berlinBounds.minLng);
+    (coords.lng - bounds.minLng) / (bounds.maxLng - bounds.minLng);
   const latRatio =
-    (berlinBounds.maxLat - coords.lat) / (berlinBounds.maxLat - berlinBounds.minLat);
+    (bounds.maxLat - coords.lat) / (bounds.maxLat - bounds.minLat);
 
   return {
     left: `${lngRatio * 100}%`,
     top: `${latRatio * 100}%`,
+  };
+}
+
+function getMapBoundsForZoomStep(zoomStep: number): MapBounds {
+  const lngSpan = (berlinBounds.maxLng - berlinBounds.minLng) / 2 ** zoomStep;
+  const latSpan = (berlinBounds.maxLat - berlinBounds.minLat) / 2 ** zoomStep;
+  const centerLng = (berlinBounds.minLng + berlinBounds.maxLng) / 2;
+  const centerLat = (berlinBounds.minLat + berlinBounds.maxLat) / 2;
+
+  return {
+    minLng: centerLng - lngSpan / 2,
+    maxLng: centerLng + lngSpan / 2,
+    minLat: centerLat - latSpan / 2,
+    maxLat: centerLat + latSpan / 2,
   };
 }
 
@@ -124,6 +150,7 @@ export default function Home() {
   const [feedbackType, setFeedbackType] = useState<FeedbackType>(null);
   const [isSubmissionFormOpen, setIsSubmissionFormOpen] = useState(false);
   const [isMapPickMode, setIsMapPickMode] = useState(false);
+  const [mapZoomStep, setMapZoomStep] = useState(MAP_MIN_ZOOM_STEP);
   const [dialogPlaceId, setDialogPlaceId] = useState<number | null>(null);
   const [ratingLoadingPlaceId, setRatingLoadingPlaceId] = useState<number | null>(null);
   const [ratingErrorState, setRatingErrorState] = useState<{ placeId: number | null; message: string }>({
@@ -150,6 +177,34 @@ export default function Home() {
     () => places.reduce((sum, place) => sum + place.deletedCount, 0),
     [places],
   );
+  const mapBounds = useMemo(() => getMapBoundsForZoomStep(mapZoomStep), [mapZoomStep]);
+  const mapEmbedUrl = useMemo(
+    () =>
+      `https://www.openstreetmap.org/export/embed.html?bbox=${mapBounds.minLng}%2C${mapBounds.minLat}%2C${mapBounds.maxLng}%2C${mapBounds.maxLat}&amp;layer=mapnik`,
+    [mapBounds],
+  );
+
+  const zoomInMap = () => {
+    setMapZoomStep((currentStep) => Math.min(currentStep + 1, MAP_MAX_ZOOM_STEP));
+  };
+
+  const zoomOutMap = () => {
+    setMapZoomStep((currentStep) => Math.max(currentStep - 1, MAP_MIN_ZOOM_STEP));
+  };
+
+  const handleMapWheel = (event: WheelEvent<HTMLElement>) => {
+    if (!event.ctrlKey && !event.shiftKey) {
+      return;
+    }
+
+    event.preventDefault();
+    if (event.deltaY < 0) {
+      zoomInMap();
+      return;
+    }
+
+    zoomOutMap();
+  };
 
   useEffect(() => {
     let aborted = false;
@@ -239,8 +294,8 @@ export default function Home() {
 
     const xRatio = (event.clientX - rect.left) / rect.width;
     const yRatio = (event.clientY - rect.top) / rect.height;
-    const lng = berlinBounds.minLng + xRatio * (berlinBounds.maxLng - berlinBounds.minLng);
-    const lat = berlinBounds.maxLat - yRatio * (berlinBounds.maxLat - berlinBounds.minLat);
+    const lng = mapBounds.minLng + xRatio * (mapBounds.maxLng - mapBounds.minLng);
+    const lat = mapBounds.maxLat - yRatio * (mapBounds.maxLat - mapBounds.minLat);
 
     setIsMapPickMode(false);
     void prefillAddressFromCoordinates(lat, lng);
@@ -413,11 +468,16 @@ export default function Home() {
   return (
     <>
       <main className="app-shell unfair-page">
-        <section className="map" aria-label="Map of unfair places">
+        <section
+          className="map"
+          aria-label="Map of unfair places"
+          aria-describedby="map-zoom-instructions"
+          onWheel={handleMapWheel}
+        >
           <iframe
             id="osm-frame"
             title="OpenStreetMap Berlin"
-            src="https://www.openstreetmap.org/export/embed.html?bbox=13.0883%2C52.3383%2C13.7612%2C52.6755&amp;layer=mapnik"
+            src={mapEmbedUrl}
           />
           <div
             className={`pin-layer${isMapPickMode ? " picking" : ""}`}
@@ -425,9 +485,9 @@ export default function Home() {
             onClick={handleMapClick}
           >
             {osmPlaces
-              .filter((place) => isWithinBerlinBounds(place.lat, place.lng))
+              .filter((place) => isWithinBounds(place.lat, place.lng, mapBounds))
               .map((place) => {
-                const osmMarkerPosition = getMarkerPosition(place);
+                const osmMarkerPosition = getMarkerPosition(place, mapBounds);
                 const title = `${place.name} (${place.amenity})`;
 
                 return (
@@ -446,9 +506,9 @@ export default function Home() {
                 );
               })}
             {places
-              .filter((place) => isWithinBerlinBounds(place.lat, place.lng))
+              .filter((place) => isWithinBounds(place.lat, place.lng, mapBounds))
               .map((place) => {
-                const placeMarkerPosition = getMarkerPosition(place);
+                const placeMarkerPosition = getMarkerPosition(place, mapBounds);
                 const title = `${place.name} — ${place.deletedCount} deleted reviews`;
 
                 return (
@@ -469,11 +529,27 @@ export default function Home() {
             {mapSelection && (
               <span
                 className={`map-selection-pin${mapSelectionLoading ? " loading" : ""}`}
-                style={getMarkerPosition(mapSelection)}
+                style={getMarkerPosition(mapSelection, mapBounds)}
                 aria-label="Selected coordinates"
               />
             )}
           </div>
+          <div className="map-zoom-controls" aria-label="Map zoom controls">
+            <button type="button" onClick={zoomInMap} aria-label="Zoom in" disabled={mapZoomStep >= MAP_MAX_ZOOM_STEP}>
+              +
+            </button>
+            <button
+              type="button"
+              onClick={zoomOutMap}
+              aria-label="Zoom out"
+              disabled={mapZoomStep <= MAP_MIN_ZOOM_STEP}
+            >
+              -
+            </button>
+          </div>
+          <p id="map-zoom-instructions" className="sr-only">
+            Hold Ctrl or Shift and use mouse wheel to zoom the map, or use the plus and minus zoom buttons.
+          </p>
         </section>
 
         <aside className="details-panel">
@@ -481,7 +557,7 @@ export default function Home() {
           <p className="intro">Community map of Berlin places reported for deleting fair negative reviews.</p>
           <p className="map-hint">
             Use &quot;Pick on map&quot; in the form to choose coordinates, or click muted OSM places (cafes, restaurants,
-            bars, pubs, nightclubs).
+            bars, pubs, nightclubs). Hold Ctrl or Shift and use mouse wheel to zoom, or use the +/− buttons.
           </p>
           {osmError && <p className="form-feedback error">{osmError}</p>}
 
