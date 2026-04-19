@@ -23,7 +23,8 @@ const places = [
 
 const pendingSubmissions = [];
 const markerById = new Map();
-let placeIdCounter = Math.max(0, ...places.map((place) => place.id)) + 1;
+let placeIdCounter =
+  places.length > 0 ? places.reduce((maxId, place) => Math.max(maxId, place.id), 0) + 1 : 1;
 let selectedPlaceId = null;
 
 const berlinBounds = {
@@ -225,19 +226,23 @@ document.getElementById("place-form").addEventListener("submit", (event) => {
     proofName: proofFile.name
   };
 
-  if (
-    !submission.name ||
-    !submission.address ||
-    !Number.isFinite(submission.lat) ||
-    !Number.isFinite(submission.lng) ||
-    !Number.isFinite(submission.deletedCount) ||
-    submission.deletedCount < 1 ||
-    !isWithinBerlinBounds(submission.lat, submission.lng)
-  ) {
-    setFormFeedback(
-      "Submission is invalid. Check all fields and use Berlin coordinates only.",
-      "error"
-    );
+  if (!submission.name || !submission.address) {
+    setFormFeedback("Place name and address are required.", "error");
+    return;
+  }
+
+  if (!Number.isFinite(submission.lat) || !Number.isFinite(submission.lng)) {
+    setFormFeedback("Latitude and longitude must be valid numbers.", "error");
+    return;
+  }
+
+  if (!isWithinBerlinBounds(submission.lat, submission.lng)) {
+    setFormFeedback("Coordinates must be within Berlin city bounds.", "error");
+    return;
+  }
+
+  if (!Number.isFinite(submission.deletedCount) || submission.deletedCount < 1) {
+    setFormFeedback("Deleted reviews count must be at least 1.", "error");
     return;
   }
 
