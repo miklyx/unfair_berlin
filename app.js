@@ -23,7 +23,7 @@ const places = [
 
 const pendingSubmissions = [];
 const markerById = new Map();
-let placeIdCounter = Math.max(...places.map((place) => place.id), 0) + 1;
+let placeIdCounter = Math.max(0, ...places.map((place) => place.id)) + 1;
 let selectedPlaceId = null;
 
 const berlinBounds = {
@@ -40,6 +40,7 @@ const totalReviewsElement = document.getElementById("total-reviews");
 const pendingCountElement = document.getElementById("pending-count");
 const topPlacesElement = document.getElementById("top-places");
 const pinLayer = document.getElementById("pin-layer");
+const formFeedbackElement = document.getElementById("form-feedback");
 
 function isWithinBerlinBounds(lat, lng) {
   return (
@@ -48,6 +49,14 @@ function isWithinBerlinBounds(lat, lng) {
     lng >= berlinBounds.minLng &&
     lng <= berlinBounds.maxLng
   );
+}
+
+function setFormFeedback(message, type) {
+  formFeedbackElement.textContent = message;
+  formFeedbackElement.className = "form-feedback";
+  if (type) {
+    formFeedbackElement.classList.add(type);
+  }
 }
 
 function setSelectedPlace(place) {
@@ -200,6 +209,7 @@ document.getElementById("place-form").addEventListener("submit", (event) => {
   const proofInput = document.getElementById("proof");
   const proofFile = proofInput.files && proofInput.files[0];
   if (!proofFile) {
+    setFormFeedback("Please upload a proof screenshot or moderation letter.", "error");
     return;
   }
 
@@ -224,11 +234,16 @@ document.getElementById("place-form").addEventListener("submit", (event) => {
     submission.deletedCount < 1 ||
     !isWithinBerlinBounds(submission.lat, submission.lng)
   ) {
+    setFormFeedback(
+      "Submission is invalid. Check all fields and use Berlin coordinates only.",
+      "error"
+    );
     return;
   }
 
   pendingSubmissions.push(submission);
   form.reset();
+  setFormFeedback("Submission sent to moderation queue.", "success");
   renderModerationQueue();
   updateStats();
 });
