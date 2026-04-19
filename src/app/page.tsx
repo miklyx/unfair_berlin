@@ -468,7 +468,12 @@ export default function Home() {
   return (
     <>
       <main className="app-shell unfair-page">
-        <section className="map" aria-label="Map of unfair places" onWheel={handleMapWheel}>
+        <section
+          className="map"
+          aria-label="Map of unfair places"
+          aria-describedby="map-zoom-instructions"
+          onWheel={handleMapWheel}
+        >
           <iframe
             id="osm-frame"
             title="OpenStreetMap Berlin"
@@ -539,9 +544,12 @@ export default function Home() {
               aria-label="Zoom out"
               disabled={mapZoomStep <= MAP_MIN_ZOOM_STEP}
             >
-              −
+              -
             </button>
           </div>
+          <p id="map-zoom-instructions" className="sr-only">
+            Hold Ctrl or Shift and use mouse wheel to zoom the map, or use the plus and minus zoom buttons.
+          </p>
         </section>
 
         <aside className="details-panel">
