@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+const SEARCH_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome Safari";
+
 function parseNumber(value: string) {
   return Number.parseFloat(value.replace(",", "."));
 }
@@ -20,7 +23,7 @@ function extractGoogleRating(html: string) {
     }
   }
 
-  const fallbackPattern = /([\d][\d.,]?)\s*stars?.{0,60}?([\d\s.,]+)\s*reviews?/i;
+  const fallbackPattern = /([0-9]+(?:[.,][0-9]+)?)\s*stars?.{0,60}?([\d\s.,]+)\s*reviews?/i;
   const fallbackMatch = html.match(fallbackPattern);
   if (fallbackMatch) {
     const rating = parseNumber(fallbackMatch[1]);
@@ -47,8 +50,7 @@ export async function GET(request: NextRequest) {
   try {
     const response = await fetch(url, {
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+        "User-Agent": SEARCH_USER_AGENT,
         "Accept-Language": "en-US,en;q=0.9",
       },
       cache: "no-store",

@@ -140,12 +140,18 @@ export default function Home() {
     setPendingSubmissions((currentPending) => currentPending.filter((item) => item.id !== submissionId));
   };
 
+  const closePlaceDialog = () => {
+    setDialogPlaceId(null);
+    setRatingLoading(false);
+    setRatingError("");
+  };
+
   const openPlaceDialog = async (place: Place) => {
     setSelectedPlaceId(place.id);
     setDialogPlaceId(place.id);
     setRatingError("");
 
-    if (place.googleRating !== null || place.googleReviewCount !== null) {
+    if (place.googleRating !== null && place.googleReviewCount !== null) {
       return;
     }
 
@@ -438,7 +444,7 @@ export default function Home() {
           <div className="place-dialog">
             <div className="place-dialog-header">
               <h3>{dialogPlace.name}</h3>
-              <button type="button" className="place-dialog-close" onClick={() => setDialogPlaceId(null)}>
+              <button type="button" className="place-dialog-close" onClick={closePlaceDialog}>
                 Close
               </button>
             </div>
