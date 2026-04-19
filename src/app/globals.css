@@ -43,6 +43,12 @@ body {
 .pin-layer {
   position: absolute;
   inset: 0;
+  pointer-events: none;
+}
+
+.pin-layer.picking {
+  pointer-events: auto;
+  cursor: crosshair;
 }
 
 .map-pin {
@@ -55,6 +61,7 @@ body {
   background: #dc2626;
   box-shadow: 0 0 0 2px #fff;
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .map-pin.selected {
@@ -110,6 +117,43 @@ body {
   margin-bottom: 1.25rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid #e5e7eb;
+}
+
+.collapsible-panel {
+  padding-bottom: 0.75rem;
+}
+
+.panel-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #111827;
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem;
+  font-weight: 600;
+}
+
+.panel-toggle-icon {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.panel-toggle.open .panel-toggle-icon {
+  transform: rotate(90deg);
+}
+
+.map-pick-button {
+  border: 1px solid #374151;
+  background: #fff;
+  color: #111827;
+}
+
+.map-pick-button.active {
+  background: #111827;
+  color: #fff;
 }
 
 .selected-place {
