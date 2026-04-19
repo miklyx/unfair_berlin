@@ -1,6 +1,6 @@
 # unfair_berlin
 
-Next.js приложение с интерактивной картой Берлина для фиксации мест, где удаляют честные негативные отзывы.
+A Next.js app with an interactive Berlin map for reporting places that remove fair negative reviews.
 
 ## Run
 
@@ -9,11 +9,11 @@ npm install
 npm run dev
 ```
 
-Откройте http://localhost:3000.
+Open http://localhost:3000.
 
-## Что внутри
+## What's inside
 
-- `src/app/page.tsx` — карта, пины, форма отправки, очередь модерации и статистика
-- `src/app/globals.css` — стили интерфейса карты и панелей
+- `src/app/page.tsx` — map, pins, submission form, moderation queue, and statistics
+- `src/app/globals.css` — styles for the map and panel UI
 - `src/app/api/notes/route.ts` — API endpoint `/api/notes`
-- `src/lib/db.ts` — инициализация SQLite и запросы
+- `src/lib/db.ts` — SQLite initialization and queries
