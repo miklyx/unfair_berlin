@@ -235,6 +235,8 @@ export default function Home() {
       deletedCount,
       platform,
       notes,
+      googleRating: null,
+      googleReviewCount: null,
       proofName: proof.name,
     };
 
