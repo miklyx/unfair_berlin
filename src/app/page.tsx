@@ -122,6 +122,8 @@ export default function Home() {
   );
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackType, setFeedbackType] = useState<FeedbackType>(null);
+  const [isSubmissionFormOpen, setIsSubmissionFormOpen] = useState(false);
+  const [isMapPickMode, setIsMapPickMode] = useState(false);
   const [dialogPlaceId, setDialogPlaceId] = useState<number | null>(null);
   const [ratingLoadingPlaceId, setRatingLoadingPlaceId] = useState<number | null>(null);
   const [ratingErrorState, setRatingErrorState] = useState<{ placeId: number | null; message: string }>({
@@ -240,6 +242,7 @@ export default function Home() {
     const lng = berlinBounds.minLng + xRatio * (berlinBounds.maxLng - berlinBounds.minLng);
     const lat = berlinBounds.maxLat - yRatio * (berlinBounds.maxLat - berlinBounds.minLat);
 
+    setIsMapPickMode(false);
     void prefillAddressFromCoordinates(lat, lng);
   };
 
@@ -404,6 +407,7 @@ export default function Home() {
     form.reset();
     setFormValues(initialFormValues);
     setMapSelection(null);
+    setIsMapPickMode(false);
   };
 
   return (
@@ -415,7 +419,11 @@ export default function Home() {
             title="OpenStreetMap Berlin"
             src="https://www.openstreetmap.org/export/embed.html?bbox=13.0883%2C52.3383%2C13.7612%2C52.6755&amp;layer=mapnik"
           />
-          <div className="pin-layer" aria-label="Place pins" onClick={handleMapClick}>
+          <div
+            className={`pin-layer${isMapPickMode ? " picking" : ""}`}
+            aria-label="Place pins"
+            onClick={handleMapClick}
+          >
             {osmPlaces
               .filter((place) => isWithinBerlinBounds(place.lat, place.lng))
               .map((place) => {
@@ -472,8 +480,8 @@ export default function Home() {
           <h1>Unfair Berlin</h1>
           <p className="intro">Community map of Berlin places reported for deleting fair negative reviews.</p>
           <p className="map-hint">
-            Click map to fill address and coordinates, or click muted OSM places (cafes, restaurants, bars, pubs,
-            nightclubs).
+            Use &quot;Pick on map&quot; in the form to choose coordinates, or click muted OSM places (cafes, restaurants,
+            bars, pubs, nightclubs).
           </p>
           {osmError && <p className="form-feedback error">{osmError}</p>}
 
@@ -501,9 +509,34 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="panel-block">
-            <h2>Submit a place</h2>
-            <form onSubmit={handleSubmit}>
+          <section className="panel-block collapsible-panel">
+            <button
+              type="button"
+              className={`panel-toggle${isSubmissionFormOpen ? " open" : ""}`}
+              aria-expanded={isSubmissionFormOpen}
+              aria-controls="submit-place-panel"
+              onClick={() => {
+                setIsSubmissionFormOpen((current) => !current);
+                setIsMapPickMode(false);
+              }}
+            >
+              <span className="panel-toggle-icon" aria-hidden="true">
+                ▸
+              </span>
+              Submit a place
+              <span className="sr-only">
+                {isSubmissionFormOpen ? " (expanded)" : " (collapsed)"}
+              </span>
+            </button>
+            {isSubmissionFormOpen && (
+              <form id="submit-place-panel" onSubmit={handleSubmit}>
+                <button
+                  type="button"
+                  className={`map-pick-button${isMapPickMode ? " active" : ""}`}
+                  onClick={() => setIsMapPickMode((current) => !current)}
+                >
+                  {isMapPickMode ? "Cancel map pick" : "Pick on map"}
+                </button>
               <label>
                 Place name
                 <input id="name" name="name" value={formValues.name} onChange={handleFormFieldChange} required />
@@ -587,7 +620,8 @@ export default function Home() {
               <p className={`form-feedback${feedbackType ? ` ${feedbackType}` : ""}`} aria-live="polite">
                 {feedbackMessage}
               </p>
-            </form>
+              </form>
+            )}
           </section>
 
           <section className="panel-block">
