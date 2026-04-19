@@ -61,6 +61,30 @@ body {
   background: #111827;
 }
 
+.map-pin-muted {
+  width: 12px;
+  height: 12px;
+  opacity: 0.55;
+  background: #6b7280;
+  box-shadow: 0 0 0 1px #fff;
+  z-index: 1;
+}
+
+.map-selection-pin {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid #0f172a;
+  background: rgb(15 23 42 / 15%);
+  pointer-events: none;
+}
+
+.map-selection-pin.loading {
+  border-style: dashed;
+}
+
 .details-panel {
   width: 360px;
   max-width: 100%;
@@ -73,6 +97,13 @@ body {
 .intro {
   margin-top: 0;
   color: #374151;
+}
+
+.map-hint {
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  color: #4b5563;
 }
 
 .panel-block {
