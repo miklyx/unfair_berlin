@@ -23,7 +23,7 @@ const places = [
 
 const pendingSubmissions = [];
 const markerById = new Map();
-let placeIdCounter = places.length + 1;
+let placeIdCounter = Math.max(...places.map((place) => place.id), 0) + 1;
 let selectedPlaceId = null;
 
 const berlinBounds = {
@@ -40,6 +40,15 @@ const totalReviewsElement = document.getElementById("total-reviews");
 const pendingCountElement = document.getElementById("pending-count");
 const topPlacesElement = document.getElementById("top-places");
 const pinLayer = document.getElementById("pin-layer");
+
+function isWithinBerlinBounds(lat, lng) {
+  return (
+    lat >= berlinBounds.minLat &&
+    lat <= berlinBounds.maxLat &&
+    lng >= berlinBounds.minLng &&
+    lng <= berlinBounds.maxLng
+  );
+}
 
 function setSelectedPlace(place) {
   selectedPlaceId = place.id;
@@ -64,6 +73,9 @@ function setSelectedPlace(place) {
 }
 
 function addPlaceMarker(place) {
+  if (!isWithinBerlinBounds(place.lat, place.lng)) {
+    return;
+  }
   const lngRatio =
     (place.lng - berlinBounds.minLng) / (berlinBounds.maxLng - berlinBounds.minLng);
   const latRatio =
@@ -71,8 +83,8 @@ function addPlaceMarker(place) {
   const marker = document.createElement("button");
   marker.type = "button";
   marker.className = "map-pin";
-  marker.style.left = `${Math.min(Math.max(lngRatio, 0), 1) * 100}%`;
-  marker.style.top = `${Math.min(Math.max(latRatio, 0), 1) * 100}%`;
+  marker.style.left = `${lngRatio * 100}%`;
+  marker.style.top = `${latRatio * 100}%`;
   marker.title = `${place.name} — ${place.deletedCount} deleted reviews`;
   marker.setAttribute("aria-label", marker.title);
   marker.addEventListener("click", () => setSelectedPlace(place));
@@ -209,7 +221,8 @@ document.getElementById("place-form").addEventListener("submit", (event) => {
     !Number.isFinite(submission.lat) ||
     !Number.isFinite(submission.lng) ||
     !Number.isFinite(submission.deletedCount) ||
-    submission.deletedCount < 1
+    submission.deletedCount < 1 ||
+    !isWithinBerlinBounds(submission.lat, submission.lng)
   ) {
     return;
   }
