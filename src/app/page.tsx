@@ -249,6 +249,14 @@ export default function Home() {
     [mapBounds],
   );
 
+  const mapBoundsRef = useRef(mapBounds);
+  const mapZoomStepRef = useRef(mapZoomStep);
+
+  useEffect(() => {
+    mapBoundsRef.current = mapBounds;
+    mapZoomStepRef.current = mapZoomStep;
+  }, [mapBounds, mapZoomStep]);
+
   const zoomInMap = () => {
     setMapZoomStep((currentStep) => {
       const nextStep = Math.min(currentStep + 1, MAP_MAX_ZOOM_STEP);
@@ -278,6 +286,20 @@ export default function Home() {
 
     zoomOutMap();
   };
+
+  useEffect(() => {
+    const mapElement = mapRef.current;
+    if (!mapElement) {
+      return;
+    }
+
+    const wheelHandler = handleMapWheel as unknown as EventListener;
+    mapElement.addEventListener("wheel", wheelHandler, { passive: false });
+
+    return () => {
+      mapElement.removeEventListener("wheel", wheelHandler);
+    };
+  }, []);
 
   useEffect(() => {
     let aborted = false;
@@ -498,9 +520,10 @@ export default function Home() {
         didMapDragRef.current = true;
       }
 
-      const lngPerPixel = (mapBounds.maxLng - mapBounds.minLng) / mapRect.width;
-      const minY = latToMercatorY(mapBounds.minLat);
-      const maxY = latToMercatorY(mapBounds.maxLat);
+      const currentBounds = mapBoundsRef.current;
+      const lngPerPixel = (currentBounds.maxLng - currentBounds.minLng) / mapRect.width;
+      const minY = latToMercatorY(currentBounds.minLat);
+      const maxY = latToMercatorY(currentBounds.maxLat);
       const yPerPixel = (maxY - minY) / mapRect.height;
       const startCenterY = latToMercatorY(dragState.startCenter.lat);
 
@@ -510,7 +533,7 @@ export default function Home() {
             lng: dragState.startCenter.lng - deltaX * lngPerPixel,
             lat: mercatorYToLat(startCenterY + deltaY * yPerPixel),
           },
-          mapZoomStep,
+          mapZoomStepRef.current,
         ),
       );
     };
@@ -527,7 +550,7 @@ export default function Home() {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", stopDragging);
     };
-  }, [isDraggingMap, mapBounds.maxLat, mapBounds.maxLng, mapBounds.minLat, mapBounds.minLng, mapZoomStep]);
+  }, [isDraggingMap]);
 
   const approveSubmission = (submissionId: number) => {
     setPendingSubmissions((currentPending) => {
@@ -688,7 +711,6 @@ export default function Home() {
           className="map"
           aria-label="Map of unfair places"
           aria-describedby="map-zoom-instructions"
-          onWheel={handleMapWheel}
         >
           <iframe
             id="osm-frame"
@@ -700,57 +722,7 @@ export default function Home() {
             aria-label="Place pins"
             onClick={handleMapClick}
             onMouseDown={handleMapMouseDown}
-          >
-            {osmPlaces
-              .filter((place) => isWithinBounds(place.lat, place.lng, mapBounds))
-              .map((place) => {
-                const osmMarkerPosition = getMarkerPosition(place, mapBounds);
-                const title = `${place.name} (${place.amenity})`;
-
-                return (
-                  <button
-                    key={place.id}
-                    type="button"
-                    className="map-pin map-pin-muted"
-                    style={osmMarkerPosition}
-                    title={title}
-                    aria-label={title}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleOsmPlaceClick(place);
-                    }}
-                  />
-                );
-              })}
-            {places
-              .filter((place) => isWithinBounds(place.lat, place.lng, mapBounds))
-              .map((place) => {
-                const placeMarkerPosition = getMarkerPosition(place, mapBounds);
-                const title = `${place.name} — ${place.deletedCount} deleted reviews`;
-
-                return (
-                  <button
-                    key={place.id}
-                    type="button"
-                    className={`map-pin${selectedPlaceId === place.id ? " selected" : ""}`}
-                    style={placeMarkerPosition}
-                    title={title}
-                    aria-label={title}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleReportedPlaceClick(place);
-                    }}
-                  />
-                );
-              })}
-            {mapSelection && (
-              <span
-                className={`map-selection-pin${mapSelectionLoading ? " loading" : ""}`}
-                style={getMarkerPosition(mapSelection, mapBounds)}
-                aria-label="Selected coordinates"
-              />
-            )}
-          </div>
+          />
           <div className="map-zoom-controls" aria-label="Map zoom controls">
             <button type="button" onClick={zoomInMap} aria-label="Zoom in" disabled={mapZoomStep >= MAP_MAX_ZOOM_STEP}>
               +

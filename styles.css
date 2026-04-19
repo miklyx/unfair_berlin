@@ -14,7 +14,7 @@ body {
   min-height: 75vh;
 }
 
-#map {
+.map {
   flex: 1 1 auto;
   min-height: 75vh;
   position: relative;
@@ -26,7 +26,7 @@ body {
   border: 0;
 }
 
-#pin-layer {
+.pin-layer {
   position: absolute;
   inset: 0;
 }
@@ -41,10 +41,52 @@ body {
   background: #dc2626;
   box-shadow: 0 0 0 2px #fff;
   cursor: pointer;
+  transition: left 0.1s ease-out, top 0.1s ease-out;
 }
 
 .map-pin.selected {
   background: #111827;
+}
+
+.map-selection-pin {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #3b82f6;
+  box-shadow: 0 0 0 2px #fff, 0 0 8px rgba(59, 130, 246, 0.5);
+  pointer-events: auto;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+  will-change: left, top;
+}
+
+.pin-layer.dragging .map-selection-pin {
+  pointer-events: none;
+}
+
+.map-selection-pin:hover:not(.loading) {
+  background: #2563eb;
+  box-shadow: 0 0 0 2px #fff, 0 0 12px rgba(37, 99, 235, 0.7);
+}
+
+.map-selection-pin:active:not(.loading) {
+  transform: translate(-50%, -100%) scale(0.85);
+}
+
+.map-selection-pin.loading {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .details-panel {
@@ -189,6 +231,76 @@ button {
 .top-places {
   margin: 0.75rem 0 0;
   padding-left: 1.1rem;
+}
+
+.place-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
+.place-dialog {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  padding: 1.5rem;
+  max-width: 400px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.place-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+
+.place-dialog-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.place-dialog-close {
+  flex-shrink: 0;
+  padding: 0.35rem 0.75rem;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.place-dialog-close:hover {
+  background: #e5e7eb;
+}
+
+.place-dialog p {
+  margin: 0.5rem 0;
+  line-height: 1.5;
+}
+
+.place-dialog-meta,
+.place-dialog-error {
+  font-size: 0.9rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.place-dialog-meta {
+  color: #6b7280;
+}
+
+.place-dialog-error {
+  color: #dc2626;
 }
 
 @media (max-width: 1024px) {
