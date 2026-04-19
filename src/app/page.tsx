@@ -11,6 +11,8 @@ type Place = {
   deletedCount: number;
   platform: string;
   notes: string;
+  googleRating: number | null;
+  googleReviewCount: number | null;
 };
 
 type Submission = Place & {
@@ -29,6 +31,8 @@ const initialPlaces: Place[] = [
     deletedCount: 8,
     platform: "Google Maps",
     notes: "Multiple users reported review removals after legal threat emails.",
+    googleRating: null,
+    googleReviewCount: null,
   },
   {
     id: 2,
@@ -39,6 +43,8 @@ const initialPlaces: Place[] = [
     deletedCount: 5,
     platform: "Tripadvisor",
     notes: "Users shared screenshots of platform notices confirming deletion.",
+    googleRating: null,
+    googleReviewCount: null,
   },
 ];
 
@@ -79,10 +85,18 @@ export default function Home() {
   );
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackType, setFeedbackType] = useState<FeedbackType>(null);
+  const [dialogPlaceId, setDialogPlaceId] = useState<number | null>(null);
+  const [ratingLoading, setRatingLoading] = useState(false);
+  const [ratingError, setRatingError] = useState("");
 
   const selectedPlace = useMemo(
     () => places.find((place) => place.id === selectedPlaceId) ?? null,
     [places, selectedPlaceId],
+  );
+
+  const dialogPlace = useMemo(
+    () => places.find((place) => place.id === dialogPlaceId) ?? null,
+    [dialogPlaceId, places],
   );
 
   const topPlaces = useMemo(
@@ -113,6 +127,8 @@ export default function Home() {
           deletedCount: submission.deletedCount,
           platform: submission.platform,
           notes: submission.notes,
+          googleRating: null,
+          googleReviewCount: null,
         },
       ]);
       setSelectedPlaceId(submission.id);
@@ -122,6 +138,48 @@ export default function Home() {
 
   const rejectSubmission = (submissionId: number) => {
     setPendingSubmissions((currentPending) => currentPending.filter((item) => item.id !== submissionId));
+  };
+
+  const openPlaceDialog = async (place: Place) => {
+    setSelectedPlaceId(place.id);
+    setDialogPlaceId(place.id);
+    setRatingError("");
+
+    if (place.googleRating !== null || place.googleReviewCount !== null) {
+      return;
+    }
+
+    setRatingLoading(true);
+
+    try {
+      const response = await fetch(
+        `/api/google-rating?name=${encodeURIComponent(place.name)}&address=${encodeURIComponent(place.address)}`,
+      );
+      if (!response.ok) {
+        throw new Error("Failed to load rating");
+      }
+
+      const payload = (await response.json()) as {
+        rating: number | null;
+        reviewCount: number | null;
+      };
+
+      setPlaces((currentPlaces) =>
+        currentPlaces.map((currentPlace) =>
+          currentPlace.id === place.id
+            ? {
+                ...currentPlace,
+                googleRating: payload.rating,
+                googleReviewCount: payload.reviewCount,
+              }
+            : currentPlace,
+        ),
+      );
+    } catch {
+      setRatingError("Could not load Google Maps rating.");
+    } finally {
+      setRatingLoading(false);
+    }
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -211,7 +269,7 @@ export default function Home() {
                     style={markerPosition}
                     title={title}
                     aria-label={title}
-                    onClick={() => setSelectedPlaceId(place.id)}
+                    onClick={() => void openPlaceDialog(place)}
                   />
                 );
               })}
@@ -367,6 +425,43 @@ export default function Home() {
           ))}
         </ul>
       </section>
+
+      {dialogPlace && (
+        <div
+          className="place-dialog-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Details for ${dialogPlace.name}`}
+        >
+          <div className="place-dialog">
+            <div className="place-dialog-header">
+              <h3>{dialogPlace.name}</h3>
+              <button type="button" className="place-dialog-close" onClick={() => setDialogPlaceId(null)}>
+                Close
+              </button>
+            </div>
+            <p>
+              Google Maps rating:{" "}
+              <strong>
+                {dialogPlace.googleRating !== null ? dialogPlace.googleRating.toFixed(1) : "Not available"}
+              </strong>
+            </p>
+            <p>
+              Google reviews:{" "}
+              <strong>
+                {dialogPlace.googleReviewCount !== null
+                  ? dialogPlace.googleReviewCount.toLocaleString()
+                  : "Not available"}
+              </strong>
+            </p>
+            <p>
+              Deleted reviews: <strong>{dialogPlace.deletedCount}</strong>
+            </p>
+            {ratingLoading && <p className="place-dialog-meta">Loading rating…</p>}
+            {ratingError && <p className="place-dialog-error">{ratingError}</p>}
+          </div>
+        </div>
+      )}
     </>
   );
 }

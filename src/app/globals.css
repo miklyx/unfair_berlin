@@ -205,6 +205,57 @@ body {
   padding-left: 1.1rem;
 }
 
+.place-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(17 24 39 / 55%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 20;
+}
+
+.place-dialog {
+  width: min(460px, 100%);
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  padding: 1rem;
+}
+
+.place-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.place-dialog-header h3 {
+  margin: 0;
+}
+
+.place-dialog-close {
+  border: 1px solid #9ca3af;
+  background: #fff;
+  color: #111827;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0.3rem 0.6rem;
+}
+
+.place-dialog-meta {
+  margin-bottom: 0;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.place-dialog-error {
+  margin-bottom: 0;
+  color: #b91c1c;
+  font-size: 0.9rem;
+}
+
 @media (max-width: 1024px) {
   .app-shell {
     flex-direction: column;
