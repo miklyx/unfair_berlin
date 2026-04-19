@@ -34,95 +34,20 @@ body {
   position: relative;
 }
 
-#osm-frame {
+.map-loading {
   width: 100%;
   height: 100%;
-  border: 0;
-  pointer-events: none;
-}
-
-.pin-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: auto;
-  cursor: grab;
-  overflow: hidden;
-}
-
-.pin-layer.picking {
-  cursor: crosshair;
-}
-
-.pin-layer.dragging {
-  cursor: grabbing;
-}
-
-.map-pin {
-  position: absolute;
-  transform: translate(-50%, -100%);
-  border: 0;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #dc2626;
-  box-shadow: 0 0 0 2px #fff;
-  cursor: pointer;
-  pointer-events: auto;
-}
-
-.map-pin.selected {
-  background: #111827;
-}
-
-.map-pin-muted {
-  width: 12px;
-  height: 12px;
-  opacity: 0.55;
-  background: #6b7280;
-  box-shadow: 0 0 0 1px #fff;
-  z-index: 1;
-}
-
-.map-selection-pin {
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  border: 2px solid #0f172a;
-  background: rgb(15 23 42 / 15%);
-  pointer-events: none;
-}
-
-.map-selection-pin.loading {
-  border-style: dashed;
-}
-
-.map-zoom-controls {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  z-index: 3;
   display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+  align-items: center;
+  justify-content: center;
+  background: #e5e7eb;
+  color: #4b5563;
+  font-size: 0.95rem;
 }
 
-.map-zoom-controls button {
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  background: #fff;
-  color: #111827;
-  font-size: 1.2rem;
-  line-height: 1;
-}
-
-.map-zoom-controls button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+/* Ensure Leaflet's own controls sit above its tile layer */
+.leaflet-control-container {
+  z-index: 10;
 }
 
 .details-panel {
@@ -333,7 +258,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  z-index: 20;
+  z-index: 1000;
 }
 
 .place-dialog {
