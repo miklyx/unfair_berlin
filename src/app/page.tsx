@@ -7,7 +7,7 @@ export default function Home() {
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-12">
       <h1 className="text-3xl font-semibold">Next.js + SQLite</h1>
       <p className="text-zinc-600 dark:text-zinc-300">
-        Все приложение работает на Next.js, а данные хранятся в SQLite.
+        The entire application runs on Next.js, and the data is stored in SQLite.
       </p>
       <section className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
         <h2 className="mb-3 text-xl font-medium">Notes from SQLite</h2>
