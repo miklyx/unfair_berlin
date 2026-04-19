@@ -163,6 +163,10 @@ function clampMapCenter(center: Coordinates, zoomStep: number) {
   };
 }
 
+function formatCoordinates(lat: number, lng: number) {
+  return `${lat.toFixed(COORDINATE_DECIMAL_PLACES)}, ${lng.toFixed(COORDINATE_DECIMAL_PLACES)}`;
+}
+
 export default function Home() {
   const [places, setPlaces] = useState<Place[]>(initialPlaces);
   const [pendingSubmissions, setPendingSubmissions] = useState<Submission[]>([]);
@@ -333,7 +337,7 @@ export default function Home() {
     }
   };
 
-  const setMapClickInfoForPlace = (title: string, lat: number, lng: number, address: string) => {
+  const showPlaceClickInfo = (title: string, lat: number, lng: number, address: string) => {
     setMapClickInfo({
       title,
       lat,
@@ -345,8 +349,7 @@ export default function Home() {
   };
 
   const resolveMapClickInfo = async (lat: number, lng: number) => {
-    const requestId = mapClickRequestRef.current + 1;
-    mapClickRequestRef.current = requestId;
+    const requestId = ++mapClickRequestRef.current;
 
     setMapClickInfo({
       title: "Map point",
@@ -440,13 +443,13 @@ export default function Home() {
       lat: place.lat.toFixed(COORDINATE_DECIMAL_PLACES),
       lng: place.lng.toFixed(COORDINATE_DECIMAL_PLACES),
     }));
-    setMapClickInfoForPlace(place.name, place.lat, place.lng, place.address);
+    showPlaceClickInfo(place.name, place.lat, place.lng, place.address);
     setFeedbackType("success");
     setFeedbackMessage("OSM place copied to the submission form.");
   };
 
   const handleReportedPlaceClick = (place: Place) => {
-    setMapClickInfoForPlace(place.name, place.lat, place.lng, place.address);
+    showPlaceClickInfo(place.name, place.lat, place.lng, place.address);
     void openPlaceDialog(place).catch(() => {
       setFeedbackType("error");
       setFeedbackMessage("Could not open place details.");
@@ -757,7 +760,7 @@ export default function Home() {
               <div className="selected-place">
                 <strong>{mapClickInfo.title}</strong>
                 <br />
-                {mapClickInfo.lat.toFixed(COORDINATE_DECIMAL_PLACES)}, {mapClickInfo.lng.toFixed(COORDINATE_DECIMAL_PLACES)}
+                {formatCoordinates(mapClickInfo.lat, mapClickInfo.lng)}
                 <br />
                 {mapClickInfo.loading && "Resolving address..."}
                 {!mapClickInfo.loading && mapClickInfo.error && `Address lookup error: ${mapClickInfo.error}`}
